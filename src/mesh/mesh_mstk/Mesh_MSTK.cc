@@ -2949,13 +2949,29 @@ MSet_ptr Mesh_MSTK::build_set(const Teuchos::RCP<const AmanziGeometry::Region>& 
     enttype = (celldim == 3) ? MFACE : MEDGE;
     mset = MSet_New(mesh,internal_name.c_str(),enttype);
 
-    if (region->type() == AmanziGeometry::BOX)  {
-
+    if (region->type() == AmanziGeometry::BOX) {
       int nface = num_entities(FACE, Parallel_type::ALL);
-        
-      for (int iface = 0; iface < nface; iface++) {
-        if (region->inside(face_centroid(iface)))
-          MSet_Add(mset,face_id_to_handle[iface]);
+
+      if (nface > 0) { 
+        if (! kdtree_faces_initialized_) {
+          face_centroid(0);
+          kdtree_faces_.Init(&face_centroids_);
+          kdtree_faces_initialized_ = true;
+        }
+
+        auto box = Teuchos::rcp_dynamic_cast<const AmanziGeometry::RegionBox>(region);
+        AmanziGeometry::Point query = (box->point0() + box->point1()) / 2;
+        double radius = AmanziGeometry::norm(box->point0() - query);
+        double radius_sqr = std::pow(radius + AmanziGeometry::TOL, 2);
+
+        std::vector<double> dist_sqr;
+        auto idx = kdtree_faces_.SearchInSphere(query, dist_sqr, radius_sqr);
+     
+        for (int i = 0; i < idx.size(); ++i) {
+          int iface = idx[i];
+          if (region->inside(face_centroid(iface)))
+            MSet_Add(mset, face_id_to_handle[iface]);
+        }
       }
     }
     else if (region->type() == AmanziGeometry::ALL)  {
@@ -2963,7 +2979,7 @@ MSet_ptr Mesh_MSTK::build_set(const Teuchos::RCP<const AmanziGeometry::Region>& 
       int nface = num_entities(FACE, Parallel_type::ALL);
         
       for (int iface = 0; iface < nface; iface++) {
-        MSet_Add(mset,face_id_to_handle[iface]);
+        MSet_Add(mset, face_id_to_handle[iface]);
       }
     }
     else if (region->type() == AmanziGeometry::PLANE ||
@@ -3305,7 +3321,6 @@ void Mesh_MSTK::get_set_entities_and_vofs(const std::string setname,
 
   // Is there an appropriate region by this name?
 
-  // Teuchos::RCP<const AmanziGeometry::Region> rgn = gm->FindRegion(setname);
   Teuchos::RCP<const AmanziGeometry::Region> rgn;
   try {
     rgn = gm->FindRegion(setname);
@@ -3375,7 +3390,8 @@ void Mesh_MSTK::get_set_entities_and_vofs(const std::string setname,
       }
     }
 
-  else if ((rgn->type() == AmanziGeometry::BOX_VOF)||(rgn->type() == AmanziGeometry::LINE_SEGMENT))
+  else if ((rgn->type() == AmanziGeometry::BOX_VOF) || 
+           (rgn->type() == AmanziGeometry::LINE_SEGMENT))
     {
       // Call routine from the base class and exit.
       Mesh::get_set_entities_box_vofs_(rgn, kind, ptype, setents, vofs);
@@ -5034,67 +5050,6 @@ void Mesh_MSTK::label_celltype()
       MEnt_Set_AttVal(region,celltype_att,ctype,0.0,NULL);
     }
   }
-}
-
-
-//------------
-// Epetra maps
-//------------
-    
-inline 
-const Epetra_Map& Mesh_MSTK::cell_map(bool include_ghost) const
-{
-  if (serial_run)
-    return *cell_map_wo_ghosts_;
-  else
-    return (include_ghost ? *cell_map_w_ghosts_ : *cell_map_wo_ghosts_);
-}
-    
-
-inline 
-const Epetra_Map& Mesh_MSTK::face_map(bool include_ghost) const
-{
-  if (serial_run)
-    return *face_map_wo_ghosts_;
-  else
-    return (include_ghost ? *face_map_w_ghosts_ : *face_map_wo_ghosts_);
-}
-    
-
-inline 
-const Epetra_Map& Mesh_MSTK::edge_map(bool include_ghost) const
-{
-  if (serial_run)
-    return *edge_map_wo_ghosts_;
-  else
-    return (include_ghost ? *edge_map_w_ghosts_ : *edge_map_wo_ghosts_);
-}
-    
-
-inline 
-const Epetra_Map& Mesh_MSTK::node_map(bool include_ghost) const
-{
-  if (serial_run)
-    return *node_map_wo_ghosts_;
-  else
-    return (include_ghost ? *node_map_w_ghosts_ : *node_map_wo_ghosts_);
-}
-
-
-inline
-const Epetra_Map& Mesh_MSTK::exterior_face_map(bool include_ghost) const
-{
-  if (serial_run)
-    return *extface_map_wo_ghosts_;
-  else
-    return (include_ghost ? *extface_map_w_ghosts_ : *extface_map_wo_ghosts_);
-}
-
-
-inline
-const Epetra_Import& Mesh_MSTK::exterior_face_importer(void) const
-{
-  return *owned_to_extface_importer_;
 }
 
 

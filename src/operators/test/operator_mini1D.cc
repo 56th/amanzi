@@ -45,7 +45,7 @@ void MiniDiffusion1D_Constant(double bcl, int type_l, double bcr, int type_r) {
 
     // initialize diffusion operator with constant coefficient
     Mini_Diffusion1D op;
-    op.Init(mesh, "planar", 1.0, 1.0);
+    op.Init(mesh);
 
     if (loop == 0) {
       double K(2.0);
@@ -101,7 +101,7 @@ TEST(OPERATOR_MINI_DIFFUSION_CONSTANT) {
   int dir = Amanzi::Operators::OPERATOR_BC_DIRICHLET;
   int neu = Amanzi::Operators::OPERATOR_BC_NEUMANN;
   MiniDiffusion1D_Constant(0.0, dir, 1.0, dir);
-  MiniDiffusion1D_Constant(0.0, dir, 6.0, neu);
+  MiniDiffusion1D_Constant(0.0, dir, -6.0, neu);
   MiniDiffusion1D_Constant(0.0, neu, 1.0, dir);
 }
 
@@ -127,7 +127,7 @@ void MiniDiffusion1D_Variable(double bcl, int type_l, double bcr, int type_r) {
 
     // initialize diffusion operator with constant coefficient
     Mini_Diffusion1D op;
-    op.Init(mesh, "planar", 1.0, 1.0);
+    op.Init(mesh);
 
     auto K = std::make_shared<WhetStone::DenseVector>(WhetStone::DenseVector(ncells));
     for (int i = 0; i < ncells; ++i) {
@@ -181,7 +181,7 @@ TEST(OPERATOR_MINI_DIFFUSION_VARIABLE) {
   int dir = Amanzi::Operators::OPERATOR_BC_DIRICHLET;
   int neu = Amanzi::Operators::OPERATOR_BC_NEUMANN;
   MiniDiffusion1D_Variable(0.0, dir, 1.0, dir);
-  MiniDiffusion1D_Variable(0.0, dir, 4.0, neu);
+  MiniDiffusion1D_Variable(0.0, dir, -4.0, neu);
   MiniDiffusion1D_Variable(0.0, neu, 1.0, dir);
 }
 

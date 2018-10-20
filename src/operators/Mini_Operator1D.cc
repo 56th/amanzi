@@ -23,19 +23,12 @@ namespace Operators {
 * Initialize 1D uniform mesh with given end-point areas and allocate
 * matrix for FV-type discretizations.
 ****************************************************************** */
-void Mini_Operator1D::Init(
-    std::shared_ptr<const WhetStone::DenseVector> mesh,
-    const std::string& geometry, double area_min, double area_max)
+void Mini_Operator1D::Init(std::shared_ptr<const WhetStone::DenseVector> mesh)
 {
   mesh_ = mesh;
-  area_min_ = area_min;
-  area_max_ = area_max;
 
   int ncells = mesh_->NumRows() - 1;
   AMANZI_ASSERT(ncells > 0);
-
-  igeo_ = 1;
-  if (geometry == "spherical") igeo_ = 2;
 
   diag_.Reshape(ncells);
   up_.Reshape(ncells);
@@ -47,7 +40,7 @@ void Mini_Operator1D::Init(
 
 
 /* ******************************************************************
-* Update matrix and right-hand sides.
+* Update matrix and right-hand side: linear model
 ****************************************************************** */
 void Mini_Operator1D::AddAccumulationTerm(double s0, double s1, double dt,
                                           WhetStone::DenseVector& sol) 
@@ -57,6 +50,45 @@ void Mini_Operator1D::AddAccumulationTerm(double s0, double s1, double dt,
     double h = (*mesh_)(i + 1) - (*mesh_)(i);
     diag_(i) += s1 * h / dt;
     rhs_(i) += s0 * sol(i) * h / dt;
+  }
+}
+
+void Mini_Operator1D::AddAccumulationTerm(
+    const WhetStone::DenseVector& s0, const WhetStone::DenseVector& s1,
+    double dt, WhetStone::DenseVector& sol) 
+{
+  int ncells = diag_.NumRows();
+  for (int i = 0; i < ncells; ++i) {
+    double h = mesh_cell_volume(i);
+    diag_(i) += s1(i) * h / dt;
+    rhs_(i) += s0(i) * sol(i) * h / dt;
+  }
+}
+
+void Mini_Operator1D::AddAccumulationTerm(const WhetStone::DenseVector& s1)
+{
+  int ncells = diag_.NumRows();
+  for (int i = 0; i < ncells; ++i) {
+    diag_(i) += s1(i) * mesh_cell_volume(i);
+  }
+}
+
+
+/* ******************************************************************
+* Matrix-vector product
+****************************************************************** */
+void Mini_Operator1D::Apply(const WhetStone::DenseVector& v,
+                            WhetStone::DenseVector& av)
+{
+  int ncells = diag_.NumRows();
+  for (int i = 0; i < ncells; ++i) {
+    av(i) = diag_(i) * v(i);
+  }
+  for (int i = 0; i < ncells - 1; ++i) {
+    av(i) += up_(i) * v(i + 1);
+  }
+  for (int i = 1; i < ncells; ++i) {
+    av(i) += down_(i) * v(i - 1);
   }
 }
 

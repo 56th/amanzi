@@ -18,6 +18,8 @@ initialized (as independent variables are owned by state, not by any PK).
 #include <ostream>
 #include <regex>
 
+#include "boost/algorithm/string/predicate.hpp"
+
 #include "Teuchos_XMLParameterListHelpers.hpp"
 #include "Epetra_Vector.h"
 
@@ -59,9 +61,17 @@ State::State(const State& other, StateConstructMode mode) :
       fields_[f_it->first] = f_it->second->Clone();
     }
 
-    for (FieldEvaluatorMap::const_iterator fm_it=other.field_evaluators_.begin();
-         fm_it!=other.field_evaluators_.end(); ++fm_it) {
-      field_evaluators_[fm_it->first] = fm_it->second->Clone();
+    for (const auto& fm_it : other.field_evaluators_) {
+      bool copied = false;
+      for (auto& fm_my : field_evaluators_) {
+        if (fm_my.second->ProvidesKey(fm_it.first)) {
+          field_evaluators_[fm_it.first] = fm_my.second;
+          copied = true;
+          break;
+        }
+      }
+      if (!copied)
+        field_evaluators_[fm_it.first] = fm_it.second->Clone();
     }
 
   } else {
@@ -233,7 +243,7 @@ Teuchos::RCP<AmanziMesh::Mesh> State::GetMesh_(Key key) const {
 Teuchos::RCP<FieldEvaluator>
 State::RequireFieldEvaluator(Key key) {
   Teuchos::RCP<FieldEvaluator> evaluator = GetFieldEvaluator_(key);
-
+  
   // See if the key is provided by another existing evaluator.
   if (evaluator == Teuchos::null) {
     for (evaluator_iterator f_it = field_evaluator_begin();
@@ -368,7 +378,7 @@ State::RequireFieldEvaluator(Key key) {
 Teuchos::RCP<FieldEvaluator>
 State::RequireFieldEvaluator(Key key, Teuchos::ParameterList& plist) {
   Teuchos::RCP<FieldEvaluator> evaluator = GetFieldEvaluator_(key);
-
+  
   // See if the key is provided by another existing evaluator.
   if (evaluator == Teuchos::null) {
     for (evaluator_iterator f_it = field_evaluator_begin();
@@ -540,8 +550,7 @@ void State::RequireConstantVector(Key fieldname, Key owner,
   Teuchos::RCP<Field> field = CheckConsistent_or_die_(fieldname, CONSTANT_VECTOR, owner);
 
   if (field == Teuchos::null) {
-    Teuchos::RCP<Field_ConstantVector> field =
-        Teuchos::rcp(new Field_ConstantVector(fieldname, Key("state"), dimension));
+    field = Teuchos::rcp(new Field_ConstantVector(fieldname, Key("state"), dimension));
     fields_[fieldname] = field;
   } else {
     Teuchos::RCP<Field_ConstantVector> cv =
@@ -566,8 +575,7 @@ State::RequireField(Key fieldname, Key owner) {
 
   if (field == Teuchos::null) {
     // Create the field and CV factory.
-    Teuchos::RCP<Field_CompositeVector> field =
-        Teuchos::rcp(new Field_CompositeVector(fieldname, owner));
+    field = Teuchos::rcp(new Field_CompositeVector(fieldname, owner));
     fields_[fieldname] = field;
     field_factories_[fieldname] = Teuchos::rcp(new CompositeVectorSpace());
   } else if (owner != Key("state")) {
@@ -586,8 +594,7 @@ State::RequireField(Key fieldname, Key owner,
 
   if (field == Teuchos::null) {
     // Create the field and CV factory.
-    Teuchos::RCP<Field_CompositeVector> field =
-        Teuchos::rcp(new Field_CompositeVector(fieldname, owner, subfield_names));
+    field = Teuchos::rcp(new Field_CompositeVector(fieldname, owner, subfield_names));
     fields_[fieldname] = field;
     field_factories_[fieldname] = Teuchos::rcp(new CompositeVectorSpace());
   } else if (owner != Key("state")) {
