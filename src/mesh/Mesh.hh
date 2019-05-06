@@ -849,6 +849,12 @@ protected:
   int compute_edge_geometry_(const Entity_ID edgeid,
                              double *length,
                              AmanziGeometry::Point *edge_vector) const;
+ 
+  // Get the host subview in 1d for a Tpetra vector 
+  Kokkos::View<double*> subview_host_(Tpetra::Vector<double> v) const{
+    auto host = v.getLocalViewHost(); 
+    return Kokkos::subview(host,Kokkos::ALL(),0);
+  }
 
  public:
   void PrintMeshStatistics() const;
@@ -865,9 +871,19 @@ protected:
   bool logical_;
   Teuchos::RCP<const Mesh> parent_;
   
+  // -- The Tpetra local map
+  mutable Teuchos::RCP<const Tpetra::Map<>> localMap_edge_; 
+  mutable Teuchos::RCP<const Tpetra::Map<>> localMap_face_; 
+  mutable Teuchos::RCP<const Tpetra::Map<>> localMap_cell_; 
+
   // the cache
   // -- geometry
-  mutable std::vector<double> cell_volumes_, face_areas_, edge_lengths_;
+  mutable Tpetra::Vector<double> cell_volumes_, face_areas_, edge_lengths_;
+  //mutable Tpetra::Vector<AmanziGeometry::Point> cell_centroids_, 
+  //                                              face_centroids_; 
+  
+  /// NOT DONE YET  
+  
   mutable std::vector<AmanziGeometry::Point> cell_centroids_, face_centroids_;
 
   // -- Have to account for the fact that a "face" for a non-manifold

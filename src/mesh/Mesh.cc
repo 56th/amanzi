@@ -449,8 +449,15 @@ int
 Mesh::compute_cell_geometric_quantities_() const
 {
   int ncells = num_entities(CELL,Parallel_type::ALL);
+  // Resize the map
+  localMap_cell_ = Teuchos::rcp(new Tpetra::Map<>(
+        ncells,0,comm_,Tpetra::LocallyReplicated));
 
-  cell_volumes_.resize(ncells);
+  cell_volumes_ = Tpetra::Vector<double>(localMap_cell_);
+  cell_centroids_.resize(ncells);
+  auto cell_volumes_1d_ = subview_host_(cell_volumes_);
+  assert(ncells == cell_volumes_1d_.extent(0));
+
   cell_centroids_.resize(ncells);
   for (int i = 0; i < ncells; i++) {
     double volume;
@@ -458,12 +465,11 @@ Mesh::compute_cell_geometric_quantities_() const
 
     compute_cell_geometry_(i,&volume,&centroid);
 
-    cell_volumes_[i] = volume;
+    cell_volumes_1d_(i) = volume;
     cell_centroids_[i] = centroid;
   }
 
   cell_geometry_precomputed_ = true;
-
   return 1;
 }
 
@@ -473,13 +479,17 @@ Mesh::compute_face_geometric_quantities_() const
 {
   if (space_dimension() == 3 && manifold_dimension() == 2) {
     // need cell centroids to compute normals
-    if (!cell_geometry_precomputed_)
+    if (!cell_geometry_precomputed_){
       compute_cell_geometric_quantities_();
+    }
   }
-
   int nfaces = num_entities(FACE,Parallel_type::ALL);
 
-  face_areas_.resize(nfaces);
+  localMap_face_ = Teuchos::rcp(new Tpetra::Map<>(
+        nfaces,0,comm_,Tpetra::LocallyReplicated));
+
+  face_areas_ = Tpetra::Vector<double>(localMap_face_);
+  auto face_areas_1d_ = subview_host_(face_areas_);
   face_centroids_.resize(nfaces);
   face_normals_.resize(nfaces);
 
@@ -494,13 +504,12 @@ Mesh::compute_face_geometric_quantities_() const
     // cells do not exist, then the normal is the null vector.
     compute_face_geometry_(i, &area, &centroid, &normals);
 
-    face_areas_[i] = area;
+    face_areas_1d_(i) = area;
     face_centroids_[i] = centroid;
     face_normals_[i] = normals;
   }
 
   face_geometry_precomputed_ = true;
-
   return 1;
 }
 
@@ -509,9 +518,13 @@ int
 Mesh::compute_edge_geometric_quantities_() const
 {
   int nedges = num_entities(EDGE,Parallel_type::ALL);
+  localMap_edge_ = Teuchos::rcp(new Tpetra::Map<>(
+        nedges,0,comm_,Tpetra::LocallyReplicated));
+
+  edge_lengths_ = Tpetra::Vector<double>(localMap_edge_);
+  auto edge_lengths_1d_ = subview_host_(edge_lengths_);
 
   edge_vectors_.resize(nedges);
-  edge_lengths_.resize(nedges);
 
   for (int i = 0; i < nedges; i++) {
     double length;
@@ -519,12 +532,11 @@ Mesh::compute_edge_geometric_quantities_() const
 
     compute_edge_geometry_(i,&length,&evector);
 
-    edge_lengths_[i] = length;
+    edge_lengths_1d_(i) = length;
     edge_vectors_[i] = evector;
   }
 
   edge_geometry_precomputed_ = true;
-
   return 1;
 }
 
@@ -779,9 +791,11 @@ Mesh::compute_edge_geometry_(const Entity_ID edgeid, double *edge_length,
 double
 Mesh::cell_volume(const Entity_ID cellid, const bool recompute) const
 {
+
   if (!cell_geometry_precomputed_) {
     compute_cell_geometric_quantities_();
-    return cell_volumes_[cellid];
+    auto cell_volumes_1d_ = subview_host_(cell_volumes_);
+    return cell_volumes_1d_(cellid);
   }
   else {
     if (recompute) {
@@ -790,8 +804,10 @@ Mesh::cell_volume(const Entity_ID cellid, const bool recompute) const
       compute_cell_geometry_(cellid, &volume, &centroid);
       return volume;
     }
-    else
-      return cell_volumes_[cellid];
+    else{
+      auto cell_volumes_1d_ = subview_host_(cell_volumes_);
+      return cell_volumes_1d_(cellid);
+    }
   }
 }
 
@@ -803,7 +819,8 @@ double Mesh::face_area(const Entity_ID faceid, const bool recompute) const
 
   if (!face_geometry_precomputed_) {
     compute_face_geometric_quantities_();
-    return face_areas_[faceid];
+    auto face_areas_1d_ = subview_host_(face_areas_);
+    return face_areas_1d_(faceid);
   }
   else {
     if (recompute) {
@@ -813,8 +830,10 @@ double Mesh::face_area(const Entity_ID faceid, const bool recompute) const
       compute_face_geometry_(faceid, &area, &centroid, &normals);
       return area;
     }
-    else
-      return face_areas_[faceid];
+    else{
+      auto face_areas_1d_ = subview_host_(face_areas_);
+      return face_areas_1d_(faceid);
+    }
   }
 }
 
@@ -827,7 +846,8 @@ Mesh::edge_length(const Entity_ID edgeid, const bool recompute) const
 
   if (!edge_geometry_precomputed_) {
     compute_edge_geometric_quantities_();
-    return edge_lengths_[edgeid];
+    auto edge_lengths_1d_ = subview_host_(edge_lengths_);
+    return edge_lengths_1d_(edgeid);
   }
   else {
     if (recompute) {
@@ -836,8 +856,10 @@ Mesh::edge_length(const Entity_ID edgeid, const bool recompute) const
       compute_edge_geometry_(edgeid, &length, &vector);
       return length;
     }
-    else
-      return edge_lengths_[edgeid];
+    else{
+      auto edge_lengths_1d_ = subview_host_(edge_lengths_);
+      return edge_lengths_1d_(edgeid);
+    }
   }
 }
 

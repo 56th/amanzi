@@ -2,9 +2,9 @@
 //! Typedefs to make forward declarations and interfaces a bit easier.
 
 /*
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Authors: Ethan Coon (ecoon@lanl.gov)
@@ -31,8 +31,8 @@
 #include "Teuchos_DefaultMpiComm.hpp"
 #include "Tpetra_Map_fwd.hpp"
 #include "Tpetra_Import_fwd.hpp"
-#include "Tpetra_Vector_fwd.hpp"
-#include "Tpetra_MultiVector_fwd.hpp"
+#include "Tpetra_Vector.hpp"
+#include "Tpetra_MultiVector.hpp"
 
 #include "Kokkos_Core.hpp"
 #ifdef HAVE_CUDA

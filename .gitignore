@@ -1,0 +1,7 @@
+build*
+install
+test_suites
+Testing
+src/pks
+doc
+install.sh
