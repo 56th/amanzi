@@ -27,8 +27,8 @@ namespace AmanziMesh {
 // Necessary typedefs and enumerations
 typedef int Set_ID;
 typedef int Entity_ID;
-typedef std::vector<Entity_ID> Entity_ID_List;
-  
+typedef Teuchos::Array<Entity_ID> Entity_ID_List;
+
 // Recongnize special meshes
 enum Mesh_type
 {

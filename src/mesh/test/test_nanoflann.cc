@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <iostream>
 
+#include "MeshDefs.hh"
+
 #include "UnitTest++.h"
 #include "nanoflann.hpp"
 
@@ -19,7 +21,8 @@ TEST(NANOFLANN) {
   double query_pt[2] = {0.5, 0.5};
   Amanzi::AmanziGeometry::Point p(0.5, 0.5);
 
-  std::vector<Amanzi::AmanziGeometry::Point> points;
+  Map_type map();
+  Vector_ptr_type points = Teuchos::rcp(new Vector_type());
 
   for (int i = 0; i < n; ++i) {
     double x = range * (rand() % 1000) / 1000.0;
@@ -35,7 +38,7 @@ TEST(NANOFLANN) {
 
   // construct a kd-tree index:
   Amanzi::AmanziMesh::PointCloud cloud;
-  cloud.Init(&points);
+  cloud.Init(points);
 
   MyKDTree tree(d, cloud, nanoflann::KDTreeSingleIndexAdaptorParams(10));
   tree.buildIndex();
@@ -46,7 +49,7 @@ TEST(NANOFLANN) {
   std::vector<double> dist_sqr(nresults);
 
   nresults = tree.knnSearch(&query_pt[0], nresults, &idx[0], &dist_sqr[0]);
-		
+
   // In case of less points in the tree than requested:
   idx.resize(nresults);
   dist_sqr.resize(nresults);
@@ -59,7 +62,7 @@ TEST(NANOFLANN) {
     CHECK_CLOSE(dist, Amanzi::AmanziGeometry::norm(points[n] - p), 1e-14);
   }
 
-  // SEARCH 2: points is a ball 
+  // SEARCH 2: points is a ball
   double radius = 0.14;
   std::vector<std::pair<size_t, double> > matches;
 

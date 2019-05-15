@@ -32,9 +32,9 @@ namespace AmanziMesh {
 
 void Mesh::get_set_entities_box_vofs_(
     Teuchos::RCP<const AmanziGeometry::Region> region,
-    const Entity_kind kind, 
-    const Parallel_type ptype, 
-    std::vector<Entity_ID>* setents,
+    const Entity_kind kind,
+    const Parallel_type ptype,
+    Entity_ID_List* setents,
     std::vector<double>* volume_fractions) const
 {
   AMANZI_ASSERT(volume_fractions != NULL);

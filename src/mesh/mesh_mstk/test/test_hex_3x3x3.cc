@@ -22,18 +22,18 @@ TEST(MSTK_HEX_3x3x3)
 
   auto comm = Amanzi::getDefaultComm();
 
-  // Load a mesh consisting of 3x3x3 elements 
+  // Load a mesh consisting of 3x3x3 elements
 
   Teuchos::RCP<Amanzi::AmanziMesh::Mesh> mesh(new Amanzi::AmanziMesh::Mesh_MSTK("test/hex_3x3x3_sets.exo",comm));
 
   nf = mesh->num_entities(Amanzi::AmanziMesh::FACE,Amanzi::AmanziMesh::Parallel_type::OWNED);
   CHECK_EQUAL(NF,nf);
-  
+
   nc = mesh->num_entities(Amanzi::AmanziMesh::CELL,Amanzi::AmanziMesh::Parallel_type::OWNED);
   CHECK_EQUAL(NC,nc);
 
 
-  std::vector<Amanzi::AmanziMesh::Entity_ID>  c2f(6);
+  Amanzi::AmanziMesh::Entity_ID_List  c2f(6);
   auto cell_map = mesh->cell_map(false);
   auto face_map = mesh->face_map(false);
   for (int c=cell_map->getMinLocalIndex(); c<=cell_map->getMaxLocalIndex(); c++)
@@ -54,6 +54,5 @@ TEST(MSTK_HEX_3x3x3)
   Amanzi::MeshAudit auditor(mesh,fout);
   auditor.Verify();
 
-  
-}
 
+}

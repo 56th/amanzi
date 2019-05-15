@@ -74,6 +74,9 @@ NOTE: Lazy definition of the cache itself is necessarily "mutable".
 #include "KDTree.hh"
 #include "MeshDefs.hh"
 
+#include "Kokkos_DefaultNode.hpp"
+
+
 // set to 0 to avoid using cache for profiling or debugging
 #define AMANZI_MESH_CACHE_VARS 1
 
@@ -442,7 +445,7 @@ class Mesh {
   int num_columns(bool ghosted=false) const;
 
   // Given a column ID, get the cells of the column - must call build_columns before calling
-  const Entity_ID_List& cells_of_column(const int columnID_) const;
+  void cells_of_column(const int columnID_, Entity_ID_List&) const;
 
   // Given a column ID, get the cells of the column - must call build_columns before calling
   const Entity_ID_List& faces_of_column(const int columnID_) const;
@@ -757,9 +760,9 @@ protected:
   // Beginning of new interface to regions using the base mesh.
   void get_set_entities_box_vofs_(
       Teuchos::RCP<const AmanziGeometry::Region> region,
-      const Entity_kind kind, 
-      const Parallel_type ptype, 
-      std::vector<Entity_ID>* setents,
+      const Entity_kind kind,
+      const Parallel_type ptype,
+      Entity_ID_List* setents,
       std::vector<double> *vofs) const;
 
 
@@ -849,12 +852,6 @@ protected:
   int compute_edge_geometry_(const Entity_ID edgeid,
                              double *length,
                              AmanziGeometry::Point *edge_vector) const;
- 
-  // Get the host subview in 1d for a Tpetra vector 
-  Kokkos::View<double*> subview_host_(Tpetra::Vector<double> v) const{
-    auto host = v.getLocalViewHost(); 
-    return Kokkos::subview(host,Kokkos::ALL(),0);
-  }
 
  public:
   void PrintMeshStatistics() const;
@@ -872,19 +869,21 @@ protected:
   Teuchos::RCP<const Mesh> parent_;
   
   // -- The Tpetra local map
-  mutable Teuchos::RCP<const Tpetra::Map<>> localMap_edge_; 
-  mutable Teuchos::RCP<const Tpetra::Map<>> localMap_face_; 
-  mutable Teuchos::RCP<const Tpetra::Map<>> localMap_cell_; 
+  mutable Map_ptr_type localMap_edge_;
+  mutable Map_ptr_type localMap_face_;
+  mutable Map_ptr_type localMap_cell_;
 
   // the cache
   // -- geometry
-  mutable Tpetra::Vector<double> cell_volumes_, face_areas_, edge_lengths_;
-  //mutable Tpetra::Vector<AmanziGeometry::Point> cell_centroids_, 
-  //                                              face_centroids_; 
-  
-  /// NOT DONE YET  
-  
-  mutable std::vector<AmanziGeometry::Point> cell_centroids_, face_centroids_;
+  mutable Vector_ptr_type<double> cell_volumes_, face_areas_, edge_lengths_;
+  //mutable Tpetra::Vector<AmanziGeometry::Point> cell_centroids_,
+  //                                              face_centroids_;
+
+  /// NOT DONE YET
+  //mutable Tpetra::Vector<AmanziGeometry::Point> cell_centroids_;
+  mutable Vector_ptr_type<AmanziGeometry::Point> cell_centroids_, face_centroids_;
+  mutable Vector_ptr_type<AmanziGeometry::Point> edge_vectors_;
+  mutable Vector_type<Entity_ID> cell_cellabove_, cell_cellbelow_;
 
   // -- Have to account for the fact that a "face" for a non-manifold
   // surface mesh can have more than one cell connected to
@@ -893,13 +892,15 @@ protected:
   // face_get_cells()[i] is face_normals_[i]
   mutable std::vector<std::vector<AmanziGeometry::Point>> face_normals_;
 
-  mutable std::vector<AmanziGeometry::Point> edge_vectors_;
 
   // -- column information, only created if columns are requested
-  mutable Entity_ID_List cell_cellabove_, cell_cellbelow_, node_nodeabove_;
-  mutable std::vector<Entity_ID_List> column_cells_;
+  mutable Entity_ID_List node_nodeabove_;
+
+  mutable CrsMatrix_ptr_type<Entity_ID> column_cells_;
+  //mutable std::vector<Entity_ID_List> column_cells_;
   mutable std::vector<Entity_ID_List> column_faces_;
-  mutable std::vector<Entity_ID> columnID_;
+  mutable Entity_ID_List columnID_;
+
   mutable int num_owned_cols_;
   mutable bool columns_built_;
   
@@ -923,7 +924,7 @@ protected:
   mutable bool cell_geometry_precomputed_, face_geometry_precomputed_, edge_geometry_precomputed_;
 
   // -- region data
-  mutable std::map<std::string, std::vector<int> > region_ids;
+  mutable std::map<std::string, Entity_ID_List > region_ids;
   mutable std::map<std::string, std::vector<double> > region_vofs;
 
   // probably should not be mutable?  these should be set by constructor and not changed! --etc

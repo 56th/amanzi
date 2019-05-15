@@ -28,19 +28,22 @@ Mesh::num_columns(bool ghosted) const
     Errors::Message mesg("num_columns called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return ghosted ? column_cells_.size() : num_owned_cols_; // number of vector of vectors
+  return ghosted ? column_cells_->getNumEntriesInGlobalRow(0) : num_owned_cols_; // number of vector of vectors
 }
 
 
-inline
-const Entity_ID_List&
-Mesh::cells_of_column(const int columnID) const
+inline void
+Mesh::cells_of_column(const int columnID, Entity_ID_List& rowinds) const
 {
   if (!columns_built_) {
     Errors::Message mesg("cells_of_column called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return column_cells_[columnID];
+  size_t numEntriesInRow = column_cells_->getNumEntriesInGlobalRow(columnID);
+  Entity_ID_List rowvals(numEntriesInRow);
+  rowinds = Entity_ID_List(numEntriesInRow);
+  column_cells_->getGlobalRowCopy(columnID,rowinds(),rowvals(),
+    numEntriesInRow);
 }
 
 
@@ -76,7 +79,7 @@ Mesh::cell_get_cell_above(const Entity_ID cellid) const
     Errors::Message mesg("cell_get_cell_above called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return cell_cellabove_[cellid];
+  return cell_cellabove_.get1dView()[cellid];
 }
 
 
@@ -88,7 +91,7 @@ Mesh::cell_get_cell_below(const Entity_ID cellid) const
     Errors::Message mesg("cell_get_cell_below called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return cell_cellbelow_[cellid];
+  return cell_cellbelow_.get1dView()[cellid];
 }
 
 

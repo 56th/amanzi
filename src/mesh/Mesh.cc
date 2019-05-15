@@ -450,23 +450,23 @@ Mesh::compute_cell_geometric_quantities_() const
 {
   int ncells = num_entities(CELL,Parallel_type::ALL);
   // Resize the map
-  localMap_cell_ = Teuchos::rcp(new Tpetra::Map<>(
+  localMap_cell_ = Teuchos::rcp(new Map_type(
         ncells,0,comm_,Tpetra::LocallyReplicated));
 
-  cell_volumes_ = Tpetra::Vector<double>(localMap_cell_);
-  cell_centroids_.resize(ncells);
-  auto cell_volumes_1d_ = subview_host_(cell_volumes_);
-  assert(ncells == cell_volumes_1d_.extent(0));
+  cell_volumes_ = Teuchos::rcp(new Vector_type<double>(localMap_cell_));
+  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(localMap_cell_,0));
+  //cell_centroids_.resize(ncells);
+  cell_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(localMap_cell_));
 
-  cell_centroids_.resize(ncells);
   for (int i = 0; i < ncells; i++) {
     double volume;
     AmanziGeometry::Point centroid(space_dim_);
 
     compute_cell_geometry_(i,&volume,&centroid);
 
-    cell_volumes_1d_(i) = volume;
-    cell_centroids_[i] = centroid;
+    cell_volumes_->get1dViewNonConst()[i] = volume;
+    //cell_centroids_.get1dViewNonConst()[i] = centroid;
+    cell_centroids_->get1dViewNonConst()[i] = centroid;
   }
 
   cell_geometry_precomputed_ = true;
@@ -485,12 +485,11 @@ Mesh::compute_face_geometric_quantities_() const
   }
   int nfaces = num_entities(FACE,Parallel_type::ALL);
 
-  localMap_face_ = Teuchos::rcp(new Tpetra::Map<>(
+  localMap_face_ = Teuchos::rcp(new Map_type(
         nfaces,0,comm_,Tpetra::LocallyReplicated));
 
-  face_areas_ = Tpetra::Vector<double>(localMap_face_);
-  auto face_areas_1d_ = subview_host_(face_areas_);
-  face_centroids_.resize(nfaces);
+  face_areas_ = Teuchos::rcp(new Vector_type<double>(localMap_face_));
+  face_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(localMap_face_));
   face_normals_.resize(nfaces);
 
   for (int i = 0; i < nfaces; i++) {
@@ -504,8 +503,8 @@ Mesh::compute_face_geometric_quantities_() const
     // cells do not exist, then the normal is the null vector.
     compute_face_geometry_(i, &area, &centroid, &normals);
 
-    face_areas_1d_(i) = area;
-    face_centroids_[i] = centroid;
+    face_areas_->get1dViewNonConst()[i] = area;
+    face_centroids_->get1dViewNonConst()[i] = centroid;
     face_normals_[i] = normals;
   }
 
@@ -518,13 +517,11 @@ int
 Mesh::compute_edge_geometric_quantities_() const
 {
   int nedges = num_entities(EDGE,Parallel_type::ALL);
-  localMap_edge_ = Teuchos::rcp(new Tpetra::Map<>(
+  localMap_edge_ = Teuchos::rcp(new Map_type(
         nedges,0,comm_,Tpetra::LocallyReplicated));
 
-  edge_lengths_ = Tpetra::Vector<double>(localMap_edge_);
-  auto edge_lengths_1d_ = subview_host_(edge_lengths_);
-
-  edge_vectors_.resize(nedges);
+  edge_lengths_ = Teuchos::rcp(new Vector_type<double>(localMap_edge_));
+  edge_vectors_ = Teuchos::rcp(new Vector_type<Amanzi::AmanziGeometry::Point>(localMap_edge_));
 
   for (int i = 0; i < nedges; i++) {
     double length;
@@ -532,8 +529,8 @@ Mesh::compute_edge_geometric_quantities_() const
 
     compute_edge_geometry_(i,&length,&evector);
 
-    edge_lengths_1d_(i) = length;
-    edge_vectors_[i] = evector;
+    edge_lengths_->get1dViewNonConst()[i] = length;
+    edge_vectors_->get1dViewNonConst()[i] = evector;
   }
 
   edge_geometry_precomputed_ = true;
@@ -746,7 +743,9 @@ Mesh::compute_face_geometry_(const Entity_ID faceid, double *area,
 
         AMANZI_ASSERT(found);
 
-        AmanziGeometry::Point cvec = fcoords[0]-cell_centroids_[cellids[i]];
+        AmanziGeometry::Point cvec =
+        fcoords[0]-cell_centroids_->get1dView()[cellids[i]];
+        //fcoords[0]-cell_centroids_.get1dView()[cellids[i]];
         AmanziGeometry::Point trinormal = cvec^evec;
 
         AmanziGeometry::Point normal = evec^trinormal;
@@ -791,11 +790,9 @@ Mesh::compute_edge_geometry_(const Entity_ID edgeid, double *edge_length,
 double
 Mesh::cell_volume(const Entity_ID cellid, const bool recompute) const
 {
-
   if (!cell_geometry_precomputed_) {
     compute_cell_geometric_quantities_();
-    auto cell_volumes_1d_ = subview_host_(cell_volumes_);
-    return cell_volumes_1d_(cellid);
+    return cell_volumes_->get1dView()[cellid];
   }
   else {
     if (recompute) {
@@ -805,8 +802,7 @@ Mesh::cell_volume(const Entity_ID cellid, const bool recompute) const
       return volume;
     }
     else{
-      auto cell_volumes_1d_ = subview_host_(cell_volumes_);
-      return cell_volumes_1d_(cellid);
+      return cell_volumes_->get1dView()[cellid];
     }
   }
 }
@@ -819,8 +815,7 @@ double Mesh::face_area(const Entity_ID faceid, const bool recompute) const
 
   if (!face_geometry_precomputed_) {
     compute_face_geometric_quantities_();
-    auto face_areas_1d_ = subview_host_(face_areas_);
-    return face_areas_1d_(faceid);
+    return face_areas_->get1dView()[faceid];
   }
   else {
     if (recompute) {
@@ -831,8 +826,7 @@ double Mesh::face_area(const Entity_ID faceid, const bool recompute) const
       return area;
     }
     else{
-      auto face_areas_1d_ = subview_host_(face_areas_);
-      return face_areas_1d_(faceid);
+      return face_areas_->get1dView()[faceid];
     }
   }
 }
@@ -846,8 +840,7 @@ Mesh::edge_length(const Entity_ID edgeid, const bool recompute) const
 
   if (!edge_geometry_precomputed_) {
     compute_edge_geometric_quantities_();
-    auto edge_lengths_1d_ = subview_host_(edge_lengths_);
-    return edge_lengths_1d_(edgeid);
+    return edge_lengths_->get1dView()[edgeid];
   }
   else {
     if (recompute) {
@@ -857,8 +850,7 @@ Mesh::edge_length(const Entity_ID edgeid, const bool recompute) const
       return length;
     }
     else{
-      auto edge_lengths_1d_ = subview_host_(edge_lengths_);
-      return edge_lengths_1d_(edgeid);
+      return edge_lengths_->get1dView()[edgeid];
     }
   }
 }
@@ -871,7 +863,8 @@ Mesh::cell_centroid(const Entity_ID cellid,
 {
   if (!cell_geometry_precomputed_) {
     compute_cell_geometric_quantities_();
-    return cell_centroids_[cellid];
+    //return cell_centroids_.get1dView()[cellid];
+    return cell_centroids_->get1dView()[cellid];
   }
   else {
     if (recompute) {
@@ -881,7 +874,8 @@ Mesh::cell_centroid(const Entity_ID cellid,
       return centroid;
     }
     else
-      return cell_centroids_[cellid];
+    //return cell_centroids_.get1dView()[cellid];
+    return cell_centroids_->get1dView()[cellid];
   }
 }
 
@@ -894,7 +888,7 @@ Mesh::face_centroid(const Entity_ID faceid, const bool recompute) const
 
   if (!face_geometry_precomputed_) {
     compute_face_geometric_quantities_();
-    return face_centroids_[faceid];
+    return face_centroids_->get1dView()[faceid];
   }
   else {
     if (recompute) {
@@ -905,7 +899,7 @@ Mesh::face_centroid(const Entity_ID faceid, const bool recompute) const
       return centroid;
     }
     else
-      return face_centroids_[faceid];
+      return face_centroids_->get1dView()[faceid];
   }
 }
 
@@ -1018,7 +1012,7 @@ Mesh::edge_vector(const Entity_ID edgeid,
     // evector_ref already points to evector
   }
   else
-    evector_ref = edge_vectors_[edgeid];
+    evector_ref = edge_vectors_->get1dView()[edgeid];
 
   if (orientation) *orientation = 1;
 
@@ -1421,10 +1415,13 @@ Mesh::build_columns(const std::string& setname) const
   int nc_owned = num_entities(CELL,Parallel_type::OWNED);
 
   columnID_.resize(nc);
-  cell_cellbelow_.resize(nc);
-  cell_cellbelow_.assign(nc,-1);
-  cell_cellabove_.resize(nc);
-  cell_cellabove_.assign(nc,-1);
+  cell_cellbelow_ = Vector_type<Entity_ID>(localMap_cell_);
+  cell_cellabove_ = Vector_type<Entity_ID>(localMap_cell_);
+  for(int i = 0 ; i < nc; ++i){
+    cell_cellbelow_.replaceGlobalValue(i,-1);
+    cell_cellabove_.replaceGlobalValue(i,-1);
+  }
+
   node_nodeabove_.resize(nn);
   node_nodeabove_.assign(nn,-1);
 
@@ -1458,6 +1455,8 @@ Mesh::build_columns(const std::string& setname) const
 
     success &= build_single_column_(i, f);
   }
+  // End of matrix filling
+  column_cells_->fillComplete();
 
   int min_success;
   Teuchos::reduceAll(*get_comm(), Teuchos::REDUCE_MIN, 1, &success, &min_success);
@@ -1490,11 +1489,22 @@ Mesh::build_columns() const
   int nc = num_entities(CELL,Parallel_type::ALL);
   int nc_owned = num_entities(CELL, Parallel_type::OWNED);
 
+  // Generate the structure
+  localMap_cell_ = Teuchos::rcp(new Map_type(
+        nc,0,comm_,Tpetra::LocallyReplicated));
+  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(localMap_cell_,0));
+
   columnID_.resize(nc);
-  cell_cellbelow_.resize(nc);
-  cell_cellbelow_.assign(nc,-1);
-  cell_cellabove_.resize(nc);
-  cell_cellabove_.assign(nc,-1);
+
+  //localMap_cell_ = Teuchos::rcp(new Map_type(
+  //      nc,0,comm_,Tpetra::LocallyReplicated));
+  cell_cellbelow_ = Vector_type<Entity_ID>(localMap_cell_);
+  cell_cellabove_ = Vector_type<Entity_ID>(localMap_cell_);
+  for(int i = 0 ; i < nc; ++i){
+    cell_cellbelow_.replaceGlobalValue(i,-1);
+    cell_cellabove_.replaceGlobalValue(i,-1);
+  }
+
   node_nodeabove_.resize(nn);
   node_nodeabove_.assign(nn,-1);
 
@@ -1532,6 +1542,8 @@ Mesh::build_columns() const
     ncolumns++;
     if (i < nf_owned) num_owned_cols_++;
   }
+  // End of matrix filling
+  column_cells_->fillComplete();
 
   int min_success;
   Teuchos::reduceAll(*get_comm(), Teuchos::REDUCE_MIN, 1, &success, &min_success);
@@ -1609,20 +1621,20 @@ Mesh::build_single_column_(int colnum, Entity_ID top_face) const
     // record the cell above and cell below
     face_get_cells(bot_face,Parallel_type::ALL,&fcells2);
     if (fcells2.size() == 2) {
-      if (cell_cellbelow_[cur_cell] != -1) {  // intersecting column of cells
+      if (cell_cellbelow_.get1dView()[cur_cell] != -1) {  // intersecting column of cells
         std::cerr << "Intersecting column of cells\n";
         success = 0;
         break;
       }
 
       if (fcells2[0] == cur_cell) {
-        cell_cellbelow_[cur_cell] = fcells2[1];
-        cell_cellabove_[fcells2[1]] = cur_cell;
+        cell_cellbelow_.get1dViewNonConst()[cur_cell] = fcells2[1];
+        cell_cellabove_.get1dViewNonConst()[fcells2[1]] = cur_cell;
         cur_cell = fcells2[1];
       }
       else if (fcells2[1] == cur_cell) {
-        cell_cellbelow_[cur_cell] = fcells2[0];
-        cell_cellabove_[fcells2[0]] = cur_cell;
+        cell_cellbelow_.get1dViewNonConst()[cur_cell] = fcells2[0];
+        cell_cellabove_.get1dViewNonConst()[fcells2[0]] = cur_cell;
         cur_cell = fcells2[0];
       }
       else {
@@ -1712,7 +1724,9 @@ Mesh::build_single_column_(int colnum, Entity_ID top_face) const
 
   if (success) {
     colfaces.push_back(bot_face);
-    column_cells_.push_back(colcells);
+    // Modify the matrix
+    Teuchos::Array<Entity_ID> colvals(colcells.size());
+    column_cells_->insertGlobalValues(colnum,colcells,colvals);
     column_faces_.push_back(colfaces);
   }
 

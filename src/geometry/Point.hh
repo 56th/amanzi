@@ -17,6 +17,10 @@
 #include <vector>
 #include <cmath>
 
+#include <Kokkos_Core.hpp>
+
+#include "Kokkos_ArithTraits.hpp"
+
 #include "dbc.hh"
 
 namespace Amanzi {
@@ -29,6 +33,10 @@ class Point {
     xyz[0] = xyz[1] = xyz[2] = 0.0;
   }
   Point(const Point& p) {
+    d = p.d;
+    std::copy(p.xyz, p.xyz+d, xyz);
+  }
+  Point(volatile const Point& p) {
     d = p.d;
     std::copy(p.xyz, p.xyz+d, xyz);
   }
@@ -92,10 +100,20 @@ class Point {
 
   int dim() const { return d; }
 
+  static inline Point nan(){
+    return Point(std::nan(""),std::nan(""),std::nan(""));
+  }
+
   // operators
   Point& operator=(const Point& p) {
     d = p.d;
     std::copy(p.xyz, p.xyz+d, xyz);
+    return *this;
+  }
+
+  volatile Point operator=(const Point& p) volatile {
+    d = p.d;
+    std::copy(p.xyz,p.xyz+d,xyz);
     return *this;
   }
 
@@ -114,6 +132,10 @@ class Point {
   Point& operator/=(const double& c) {
     for (int i = 0; i < d; i++) xyz[i] /= c;
     return *this;
+  }
+
+  bool operator>(const Point&p) const {
+    return xyz[0]>p.xyz[0] && xyz[1]>p.xyz[1] && xyz[2]>p.xyz[2];
   }
 
   friend Point operator*(const double& r, const Point& p) {
@@ -156,6 +178,8 @@ class Point {
     return os;
   }
 
+  static Point this_type_is_missing_a_specialization(){}
+
  private:
   int d;
   double xyz[3];
@@ -180,5 +204,23 @@ inline bool operator!=(const Point& p, const Point& q) {
 }  // namespace AmanziGeometry
 }  // namespace Amanzi
 
-#endif
+// Point specialization
+template<>
+struct Kokkos::ArithTraits<Amanzi::AmanziGeometry::Point> {
+  using Point = Amanzi::AmanziGeometry::Point;
+  typedef Point val_type;
+  typedef Point mag_type;
 
+  static inline Point nan(){
+    return Point(std::nan(""),std::nan(""),std::nan(""));
+  }
+  static inline Point abs(const val_type& p){
+    return Point(
+      p[0]>=0?p[0]:-p[0],
+      p[1]>=0?p[1]:-p[1],
+      p[2]>=0?p[2]:-p[2]);
+  }
+};
+
+
+#endif

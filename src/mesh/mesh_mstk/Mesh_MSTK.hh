@@ -271,10 +271,10 @@ class Mesh_MSTK : public Mesh {
   using Mesh::get_set_entities;
 
   virtual
-  void get_set_entities_and_vofs(const std::string setname, 
-                                 const Entity_kind kind, 
-                                 const Parallel_type ptype, 
-                                 std::vector<Entity_ID> *entids,
+  void get_set_entities_and_vofs(const std::string setname,
+                                 const Entity_kind kind,
+                                 const Parallel_type ptype,
+                                 Entity_ID_List *entids,
                                  std::vector<double> *vofs) const;
 
 

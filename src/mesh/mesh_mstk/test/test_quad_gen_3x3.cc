@@ -31,15 +31,15 @@ TEST(MSTK_QUAD_GEN_3x3)
 
   nv = mesh->num_entities(Amanzi::AmanziMesh::NODE,Amanzi::AmanziMesh::Parallel_type::OWNED);
   CHECK_EQUAL(NV,nv);
-  
+
   nf = mesh->num_entities(Amanzi::AmanziMesh::FACE,Amanzi::AmanziMesh::Parallel_type::OWNED);
   CHECK_EQUAL(NF,nf);
-  
+
   nc = mesh->num_entities(Amanzi::AmanziMesh::CELL,Amanzi::AmanziMesh::Parallel_type::OWNED);
   CHECK_EQUAL(NC,nc);
 
 
-  std::vector<Amanzi::AmanziMesh::Entity_ID>  c2f(6);
+  Amanzi::AmanziMesh::Entity_ID_List  c2f(6);
   auto cell_map = mesh->cell_map(false);
   auto face_map = mesh->face_map(false);
   for (int c=cell_map->getMinLocalIndex(); c<=cell_map->getMaxLocalIndex(); c++)
@@ -59,4 +59,3 @@ TEST(MSTK_QUAD_GEN_3x3)
   auditor.Verify();
 
 }
-

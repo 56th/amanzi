@@ -33,6 +33,7 @@
 #include "Tpetra_Import_fwd.hpp"
 #include "Tpetra_Vector.hpp"
 #include "Tpetra_MultiVector.hpp"
+#include "Tpetra_CrsMatrix.hpp"
 
 #include "Kokkos_Core.hpp"
 #ifdef HAVE_CUDA
@@ -72,13 +73,17 @@ typedef Teuchos::MpiComm<int> MpiComm_type;
 typedef Tpetra::Map<> Map_type;
 typedef Tpetra::Map<> BlockMap_type; // is there a Tpetra block map?
 typedef Tpetra::Import<> Import_type;
+typedef Tpetra::CrsGraph<> CrsGraph_type;
 
 // Tpetra vectors
-typedef Tpetra::Vector<> Vector_type;
+template<typename T>
+using Vector_type =  Tpetra::Vector<T>;
+template<typename T>
+using MultiVector_type = Tpetra::MultiVector<T> ;
+template<typename T>
+using CrsMatrix_type = Tpetra::CrsMatrix<T> ;
 typedef Tpetra::Vector<int> IntVector_type;
-typedef Tpetra::MultiVector<> MultiVector_type;
 typedef Tpetra::MultiVector<int> IntMultiVector_type;
-
 
 #else // Trilinos Epetra stack
 
@@ -107,16 +112,25 @@ typedef Teuchos::RCP<const Comm_type> Comm_ptr_type;
 typedef Teuchos::RCP<const Map_type> Map_ptr_type;
 typedef Teuchos::RCP<const BlockMap_type> BlockMap_ptr_type;
 typedef Teuchos::RCP<const Import_type> Import_ptr_type;
+typedef Teuchos::RCP<const CrsGraph_type> CrsGraph_ptr_type;
 
 // non-const
-typedef Teuchos::RCP<Vector_type> Vector_ptr_type;
-typedef Teuchos::RCP<MultiVector_type> MultiVector_ptr_type;
+template<typename T>
+using Vector_ptr_type = Teuchos::RCP<Vector_type<T>>;
+template<typename T>
+using MultiVector_ptr_type = Teuchos::RCP<MultiVector_type<T>>;
+template<typename T>
+using CrsMatrix_ptr_type = Teuchos::RCP<CrsMatrix_type<T>>;
 typedef Teuchos::RCP<IntVector_type> IntVector_ptr_type;
 //typedef Teuchos::RCP<MultiIntVector_type> MultiIntVector_ptr_type;
 
 // const
-typedef Teuchos::RCP<const Vector_type> cVector_ptr_type;
-typedef Teuchos::RCP<const MultiVector_type> cMultiVector_ptr_type;
+template<typename T>
+using cVector_ptr_type = Teuchos::RCP<const Vector_type<T>> ;
+template<typename T>
+using cMultiVector_ptr_type = Teuchos::RCP<const MultiVector_type<T>> ;
+template<typename T>
+using cCrsMatrix_ptr_type = Teuchos::RCP<const CrsMatrix_type<T>> ;
 typedef Teuchos::RCP<const IntVector_type> cIntVector_ptr_type;
 //typedef Teuchos::RCP<const MultiIntVector_type> cMultiIntVector_ptr_type;
 

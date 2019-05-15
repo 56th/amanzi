@@ -16,6 +16,7 @@
 #include <memory>
 #include <vector>
 
+#include "MeshDefs.hh"
 #include "Point.hh"
 
 namespace Amanzi {
@@ -30,10 +31,10 @@ class PointCloud {
 
   // Interface for nanoflann
   // -- must return the number of points in the cloud
-  inline size_t kdtree_get_point_count() const { return points_->size(); }
+  inline size_t kdtree_get_point_count() const { return points_->getGlobalLength(); }
 
   // -- must return the i-th component of the n-th point
-  inline double kdtree_get_pt(const size_t n, const size_t i) const { return (*points_)[n][i]; }
+  inline double kdtree_get_pt(const size_t n, const size_t i) const { return points_->get1dView()[n][i]; }
 
   // -- must return optional bounding-box status:
   //    false to default to a standard bounding box computation loop.
@@ -42,10 +43,10 @@ class PointCloud {
   template <class BoundingBox>
   bool kdtree_get_bbox(BoundingBox& bb) const { return false; }
 
-  void Init(const std::vector<AmanziGeometry::Point>* points) { points_ = points; }
+  void Init(Vector_ptr_type<AmanziGeometry::Point> points) { points_ = points; }
 
  private:
-  const std::vector<AmanziGeometry::Point>* points_;
+  Vector_ptr_type<AmanziGeometry::Point> points_;
 };
 
 
@@ -59,8 +60,8 @@ class KDTree {
   ~KDTree() {};
 
   // main member function
-  void Init(const std::vector<AmanziGeometry::Point>* points) {
-    int d = (*points)[0].dim();
+  void Init(const Vector_ptr_type<AmanziGeometry::Point> points) {
+    int d = points->get1dView()[0].dim();
     cloud_.Init(points);
     tree_ = std::make_shared<KDTree_L2Adaptor>(d, cloud_, nanoflann::KDTreeSingleIndexAdaptorParams(10));
     tree_->buildIndex();
