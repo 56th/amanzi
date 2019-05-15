@@ -2,9 +2,9 @@
   WhetStone, Version 2.2
   Release name: naka-to.
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Konstantin Lipnikov (lipnikov@lanl.gov)
@@ -32,7 +32,7 @@ enum class ProjectorType {
 
 #ifdef AMANZI_CODE
 typedef AmanziGeometry::Entity_ID Entity_ID;
-typedef std::vector<Entity_ID> Entity_ID_List;
+typedef Teuchos::Array<Entity_ID> Entity_ID_List;
 typedef AmanziMesh::Parallel_type Parallel_type;
 typedef AmanziMesh::Entity_kind Entity_kind;
 
@@ -88,11 +88,11 @@ const int WHETSTONE_SIMPLEX_FUNCTIONAL_TRACE = 2;
 
 // various MFD schemes
 const int DIFFUSION_OPTIMIZED_FOR_SPARSITY = 9;  // recommended
-const int DIFFUSION_POLYHEDRA_SCALED = 2; 
-const int DIFFUSION_OPTIMIZED_FOR_MONOTONICITY = 3;  
+const int DIFFUSION_POLYHEDRA_SCALED = 2;
+const int DIFFUSION_OPTIMIZED_FOR_MONOTONICITY = 3;
 const int DIFFUSION_HEXAHEDRA_MONOTONE = 4;
 const int DIFFUSION_SUPPORT_OPERATOR = 7;
-const int DIFFUSION_TPFA = 5; 
+const int DIFFUSION_TPFA = 5;
 
 const int ELECTROMAGNETICS_DEFAULT = 1;
 const int ELECTROMAGNETICS_GENERALIZED = 2;
@@ -101,10 +101,9 @@ const int ELECTROMAGNETICS_GENERALIZED = 2;
 const int TAYLOR_BASIS_NATURAL = 1;
 const int TAYLOR_BASIS_NORMALIZED = 2;
 const int TAYLOR_BASIS_NORMALIZED_ORTHO = 3;  // recommended
-const int TAYLOR_BASIS_REGULARIZED = 4; 
+const int TAYLOR_BASIS_REGULARIZED = 4;
 
 }  // namespace WhetStone
 }  // namespace Amanzi
 
 #endif
-

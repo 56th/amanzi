@@ -1,9 +1,9 @@
 /*
   Data Structures
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Ethan Coon (ecoon@lanl.gov)
@@ -67,15 +67,15 @@ public:
   }
 
   // -- Access a view of a single component's data.
-  cMultiVector_ptr_type
+  cMultiVector_ptr_type<double>
   GetComponent(std::string name) const;
 
-  MultiVector_ptr_type
+  MultiVector_ptr_type<double>
   GetComponent(std::string name);
 
   // Mutators of data
   // -- Set entries in the vectors.
-  void SetComponent(std::string name, const MultiVector_ptr_type& data);
+  void SetComponent(std::string name, const MultiVector_ptr_type<double>& data);
 
   // Vector operations.
   // Insert value into data.
@@ -107,7 +107,7 @@ public:
 
   // this <- element wise reciprocal(this)
   int Reciprocal(const BlockVector& other);
-  
+
   // result <- other \dot this
   int Dot(const BlockVector& other, double* result) const;
 
@@ -158,7 +158,7 @@ private:
   std::vector<int> num_dofs_;
   std::vector<Map_ptr_type > maps_;
   std::vector<unsigned int> sizes_;
-  std::vector<MultiVector_ptr_type> data_;
+  std::vector<MultiVector_ptr_type<double>> data_;
 };
 
 } // namespace

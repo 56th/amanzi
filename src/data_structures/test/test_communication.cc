@@ -47,9 +47,9 @@ TEST(COMMUNICATION_PATTERN_DISTINCT_VECTORS) {
 
   Import_type importer(owned_map, ghost_map);
 
-  auto ghost = Teuchos::rcp(new MultiVector_type(ghost_map, 1));
+  auto ghost = Teuchos::rcp(new MultiVector_type<double>(ghost_map, 1));
   //  auto owned = ghost->offsetViewNonConst(owned_map, 0);
-  auto owned = Teuchos::rcp(new MultiVector_type(owned_map, 1));
+  auto owned = Teuchos::rcp(new MultiVector_type<double>(owned_map, 1));
 
   owned->putScalar((double)(rank+1));
   ghost->doImport(*owned, importer, Tpetra::INSERT);
@@ -95,7 +95,7 @@ TEST(COMMUNICATION_PATTERN_OFFSET_VIEW) {
 
   Import_type importer(owned_map, ghost_map);
 
-  auto ghost = Teuchos::rcp(new MultiVector_type(ghost_map, 1));
+  auto ghost = Teuchos::rcp(new MultiVector_type<double>(ghost_map, 1));
   auto owned = ghost->offsetViewNonConst(owned_map, 0);
 
   owned->putScalar((double)(rank+1));
@@ -135,7 +135,7 @@ TEST(COMMUNICATION_PATTERN_VANDELAY) {
 
     std::vector<int> gids_v{0};
     vandelay_map = Teuchos::rcp(new Map_type(2, gids_v.data(), 1, 0, comm));
-    
+
   } else {
     std::vector<int> gids_owned{2,3};
     owned_map = Teuchos::rcp(new Map_type(4, gids_owned.data(), 2, 0, comm));
@@ -151,9 +151,9 @@ TEST(COMMUNICATION_PATTERN_VANDELAY) {
   Import_type importer(owned_map, ghost_map);
   Import_type vandelay_importer(owned_map, vandelay_map);
 
-  auto ghost = Teuchos::rcp(new MultiVector_type(ghost_map, 1));
+  auto ghost = Teuchos::rcp(new MultiVector_type<double>(ghost_map, 1));
   auto owned = ghost->offsetViewNonConst(owned_map, 0);
-  auto vand = Teuchos::rcp(new MultiVector_type(vandelay_map, 1));
+  auto vand = Teuchos::rcp(new MultiVector_type<double>(vandelay_map, 1));
 
   owned->putScalar((double)(rank+1));
   ghost->doImport(*owned, importer, Tpetra::INSERT);
@@ -184,13 +184,13 @@ TEST(COMMUNICATION_PATTERN_VANDELAY) {
       CHECK_CLOSE(2.0, vand_v(0,0), 1.e-6);
     }
   }
-  
+
 }
 
 
 TEST(COMMUNICATION_INTERMEDIATE) {
   using namespace Amanzi;
-  
+
   auto comm = getDefaultComm();
   int rank = comm->getRank();
   AmanziMesh::Preference pref;
@@ -202,9 +202,9 @@ TEST(COMMUNICATION_INTERMEDIATE) {
 
   auto mesh = meshfactory.create(0.0, 0.0, 0.0, 4.0, 4.0, 4.0, 1, 1, 8);
 
-  auto ghost = Teuchos::rcp(new MultiVector_type(mesh->face_map(true), 1));
+  auto ghost = Teuchos::rcp(new MultiVector_type<double>(mesh->face_map(true), 1));
   auto owned = ghost->offsetViewNonConst(mesh->face_map(false), 0);
-  auto vand = Teuchos::rcp(new MultiVector_type(mesh->exterior_face_map(false), 1));
+  auto vand = Teuchos::rcp(new MultiVector_type<double>(mesh->exterior_face_map(false), 1));
 
   Import_type importer(mesh->face_map(false), mesh->face_map(true));
   owned->putScalar((double)(rank+1));

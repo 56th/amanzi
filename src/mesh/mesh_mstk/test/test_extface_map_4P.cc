@@ -14,7 +14,7 @@ TEST(MSTK_EXTFACE_MAP_4P)
 {
 
   int i, j, k, err, nc, nf, nv;
-  std::vector<Amanzi::AmanziMesh::Entity_ID> faces(6), nodes(8);
+  Amanzi::AmanziMesh::Entity_ID_List faces(6), nodes(8);
   std::vector<int> facedirs(6);
   std::vector<Amanzi::AmanziGeometry::Point> ccoords(8), fcoords(4);
 
@@ -42,13 +42,13 @@ TEST(MSTK_EXTFACE_MAP_4P)
       CHECK_EQUAL(1,fcells.size());
     }
 
-  Amanzi::Vector_type allvec(face_map);
-  Amanzi::Vector_type bdryvec(extface_map);
+  Amanzi::Vector_type<double> allvec(face_map);
+  Amanzi::Vector_type<double> bdryvec(extface_map);
 
   // Insert the GlobalID of each face offsetted by 3 into the allvec
   {
     auto allvec_v = allvec.getDataNonConst();
-    for (int f = face_map->getMinLocalIndex(); f < face_map->getMaxLocalIndex(); f++) 
+    for (int f = face_map->getMinLocalIndex(); f < face_map->getMaxLocalIndex(); f++)
       allvec_v[f] = face_map->getGlobalElement(f)+3;
   }
 
@@ -60,7 +60,7 @@ TEST(MSTK_EXTFACE_MAP_4P)
   bdryvec.sync_host();
   {
     auto bdryvec_v = bdryvec.getData();
-    for (int f = extface_map->getMinLocalIndex(); f < extface_map->getMaxLocalIndex(); f++) 
+    for (int f = extface_map->getMinLocalIndex(); f < extface_map->getMaxLocalIndex(); f++)
       CHECK_EQUAL(extface_map->getGlobalElement(f),bdryvec_v[f]-3);
   }
 
@@ -86,4 +86,3 @@ TEST(MSTK_EXTFACE_MAP_4P)
   }
 
 }
-

@@ -1,7 +1,7 @@
 /*
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Authors: Rao Garimella, others
@@ -18,7 +18,7 @@ STKmesh etc.)
 Assumptions:
 
 Cells in a 2D mesh must be oriented counter clockwise. This is not
-applied to meshes on manifolds.   
+applied to meshes on manifolds.
 
 Design documentation:
 
@@ -96,7 +96,7 @@ class Mesh {
        const bool request_edges);
 
  public:
-  
+
   // virtual destructor
   virtual ~Mesh() = default;
 
@@ -157,7 +157,7 @@ class Mesh {
   Teuchos::RCP<const Teuchos::ParameterList> parameter_list() const {
     return plist_;
   }
-  
+
   // Set/Get mesh type - RECTANGULAR, GENERAL (See MeshDefs.hh)
   void set_mesh_type(const Mesh_type mesh_type) {
     mesh_type_ = mesh_type;
@@ -244,9 +244,9 @@ class Mesh {
   // non-standard cells), the list of faces will be in arbitrary order
   //
   // EXTENSIONS: MSTK FRAMEWORK: by the way the parallel partitioning,
-  // send-receive protocols and mesh query operators are designed, a side 
+  // send-receive protocols and mesh query operators are designed, a side
   // effect of this is that master and ghost entities will have the same
-  // hierarchical topology. 
+  // hierarchical topology.
   void cell_get_faces(const Entity_ID cellid,
                       Entity_ID_List *faceids,
                       const bool ordered=false) const;
@@ -440,7 +440,7 @@ class Mesh {
 
   virtual
   int build_columns() const;
-  
+
   // Number of columns in mesh - must call build_columns before calling
   int num_columns(bool ghosted=false) const;
 
@@ -448,7 +448,7 @@ class Mesh {
   void cells_of_column(const int columnID_, Entity_ID_List&) const;
 
   // Given a column ID, get the cells of the column - must call build_columns before calling
-  const Entity_ID_List& faces_of_column(const int columnID_) const;
+  void faces_of_column(const int columnID_, Entity_ID_List&) const;
 
   // Given a cell, get its column ID - must call build_columns before calling
   int column_ID(const Entity_ID cellid) const;
@@ -591,13 +591,13 @@ class Mesh {
   // otherwise.
   //
   // This is a rudimentary capability that requires ghosts nodes
-  // also to be deformed. Amanzi does not have any built-in parallel 
+  // also to be deformed. Amanzi does not have any built-in parallel
   // communication capabilities, other than Trilinos object
-  // communication or raw MPI. 
+  // communication or raw MPI.
   virtual
   int deform(const Entity_ID_List& nodeids,
              const AmanziGeometry::Point_List& new_positions);
-  
+
   // Deform the mesh by moving given nodes to given coordinates, one at a
   // time, ensuring validity at all points through the deformation, which is a
   // really bad idea for deformations that move large numbers of nodes more
@@ -610,9 +610,9 @@ class Mesh {
   // returned in final_positions
   //
   // This is a rudimentary capability that requires ghosts nodes
-  // also to be deformed. Amanzi does not have any built-in parallel 
+  // also to be deformed. Amanzi does not have any built-in parallel
   // communication capabilities, other than Trilinos object
-  // communication or raw MPI. 
+  // communication or raw MPI.
   virtual
   int deform(const Entity_ID_List& nodeids,
              const AmanziGeometry::Point_List& new_positions,
@@ -648,7 +648,7 @@ class Mesh {
     Exceptions::amanzi_throw(mesg);
     throw(mesg);
   }
-  
+
   // Get cell map
   virtual
   Map_ptr_type cell_map(bool include_ghost) const = 0;
@@ -720,12 +720,12 @@ class Mesh {
 
   // -- deprecated interface
   virtual
-  void get_set_entities(const Set_ID setid, 
-                        const Entity_kind kind, 
-                        const Parallel_type ptype, 
+  void get_set_entities(const Set_ID setid,
+                        const Entity_kind kind,
+                        const Parallel_type ptype,
                         Entity_ID_List *entids) const;
 
-  // -- new interface. Since not all regions support volume fractions 
+  // -- new interface. Since not all regions support volume fractions
   // (vofs), this vector is optional and could be empty.
   virtual
   void get_set_entities_and_vofs(const std::string setname,
@@ -867,7 +867,7 @@ protected:
 
   bool logical_;
   Teuchos::RCP<const Mesh> parent_;
-  
+
   // -- The Tpetra local map
   mutable Map_ptr_type localMap_edge_;
   mutable Map_ptr_type localMap_face_;
@@ -903,7 +903,7 @@ protected:
 
   mutable int num_owned_cols_;
   mutable bool columns_built_;
-  
+
   // -- topology
   mutable std::vector<Entity_ID_List> cell_face_ids_;
   mutable std::vector< std::vector<int> > cell_face_dirs_;  // 1 or -1
@@ -945,4 +945,3 @@ protected:
 }  // namespace Amanzi
 
 #endif
-

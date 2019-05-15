@@ -47,15 +47,14 @@ Mesh::cells_of_column(const int columnID, Entity_ID_List& rowinds) const
 }
 
 
-inline
-const Entity_ID_List&
-Mesh::faces_of_column(const int columnID) const
+inline void
+Mesh::faces_of_column(const int columnID, Entity_ID_List& rowinds) const
 {
   if (!columns_built_) {
     Errors::Message mesg("faces_of_columns called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return column_faces_[columnID];
+  rowinds = column_faces_[columnID];
 }
 
 
@@ -120,5 +119,3 @@ Mesh::get_set_entities(const std::string setname,
   std::vector<double> vofs;
   get_set_entities_and_vofs(setname, kind, ptype, entids, &vofs);
 }
-
-

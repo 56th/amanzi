@@ -1,9 +1,9 @@
 /*
   Mesh Functions
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author Ethan Coon
@@ -13,7 +13,7 @@
 */
 
 #include "errors.hh"
-#include "MeshDefs.hh"
+#include "Mesh.hh"
 #include "CompositeVectorFunction.hh"
 
 namespace Amanzi {
@@ -41,7 +41,7 @@ void CompositeVectorFunction::Compute(double time,
 
   cv->PutScalar(0.);
 
-#ifdef ENSURE_INITIALIZED_CVFUNCS  
+#ifdef ENSURE_INITIALIZED_CVFUNCS
   // ensure all components are touched
   std::map<std::string,bool> done;
   for (auto compname : *cv) {
@@ -58,10 +58,10 @@ void CompositeVectorFunction::Compute(double time,
   for (CompositeVectorSpecList::const_iterator cv_spec=cv_spec_list_.begin();
        cv_spec!=cv_spec_list_.end(); ++cv_spec) {
     std::string compname = (*cv_spec)->first;
-#ifdef ENSURE_INITIALIZED_CVFUNCS  
+#ifdef ENSURE_INITIALIZED_CVFUNCS
     done[compname] = true;
 #endif
-    
+
     auto compvec = cv->ViewComponent<AmanziDefaultHost>(compname,false);
     Teuchos::RCP<MeshFunction::Spec> spec = (*cv_spec)->second;
 
@@ -198,7 +198,7 @@ void CompositeVectorFunction::Compute(double time,
     }
   }
 
-#ifdef ENSURE_INITIALIZED_CVFUNCS  
+#ifdef ENSURE_INITIALIZED_CVFUNCS
   for (auto compname : *cv) {
     if (!done[compname]) {
       Errors::Message message;

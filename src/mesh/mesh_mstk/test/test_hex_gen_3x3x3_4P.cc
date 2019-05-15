@@ -16,7 +16,7 @@ TEST(MSTK_HEX_GEN_3x3x3_4P)
 {
 
   int i, j, k, err, nc, nf, nv;
-  std::vector<Amanzi::AmanziMesh::Entity_ID> faces(6), nodes(8);
+  Amanzi::AmanziMesh::Entity_ID_List faces(6), nodes(8);
   std::vector<Amanzi::AmanziGeometry::Point> ccoords(8), fcoords(4);
 
   auto comm = Amanzi::getDefaultComm();
@@ -38,7 +38,7 @@ TEST(MSTK_HEX_GEN_3x3x3_4P)
   Teuchos::RCP<Amanzi::AmanziMesh::Mesh> mesh(new Amanzi::AmanziMesh::Mesh_MSTK(0.0,0.0,0.0,1.0,1.0,1.0,3,3,3,comm));
 
 
-  std::vector<Amanzi::AmanziMesh::Entity_ID>  c2f(6);
+  Amanzi::AmanziMesh::Entity_ID_List c2f(6);
   auto cell_map = mesh->cell_map(false);
   auto face_map = mesh->face_map(true);
 
@@ -66,7 +66,6 @@ TEST(MSTK_HEX_GEN_3x3x3_4P)
   fname << "test/mstk_hex_gen_3x3x3_4P." << rank << ".out";
   std::ofstream fout(fname.str().c_str());
   Amanzi::MeshAudit auditor(mesh,fname);
-  auditor.Verify();  
+  auditor.Verify();
 
 }
-

@@ -14,7 +14,7 @@ TEST(MSTK_QUAD_GEN_3x3_4P)
 {
 
   int i, j, k, err, nc, nf, nv;
-  std::vector<Amanzi::AmanziMesh::Entity_ID> faces(6), nodes(8);
+  Amanzi::AmanziMesh::Entity_ID_List faces(6), nodes(8);
   std::vector<Amanzi::AmanziGeometry::Point> ccoords(8), fcoords(4);
 
   auto comm = Amanzi::getDefaultComm();
@@ -33,7 +33,7 @@ TEST(MSTK_QUAD_GEN_3x3_4P)
 
 
 
-  std::vector<Amanzi::AmanziMesh::Entity_ID>  c2f(4);
+  Amanzi::AmanziMesh::Entity_ID_List c2f(4);
   auto cell_map = mesh->cell_map(false);
   auto face_map = mesh->face_map(true);
 
@@ -65,4 +65,3 @@ TEST(MSTK_QUAD_GEN_3x3_4P)
 
 
 }
-

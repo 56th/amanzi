@@ -1,7 +1,7 @@
 /*
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Authors: Ethan Coon
@@ -114,7 +114,7 @@ public:
     return ghosted ? ghostvec_->size(name) : mastervec_->size(name); }
 
   int GlobalLength() const { return mastervec_->GlobalLength(); }
-  
+
   // Access the VectorSpace for each component.
   Teuchos::RCP<const Map_type> ComponentMap(const std::string& name,
           bool ghosted=false) const {
@@ -232,11 +232,11 @@ public:
   int PutScalar(double scalar);
 
   // Sets all vectors to value including ghosted elements.
-  // Different name is given so it cannot be used in a templated code.   
+  // Different name is given so it cannot be used in a templated code.
   int PutScalarMasterAndGhosted(double scalar);
 
   // Sets ghost elements to value.
-  // Different name is given so it cannot be used in a templated code.   
+  // Different name is given so it cannot be used in a templated code.
   int PutScalarGhosted(double scalar);
 
   // v(name,:,:) = scalar
@@ -251,7 +251,7 @@ public:
 
   // this <- abs(this)
   int Abs(const CompositeVector& other);
-  
+
   // this(name,:,:) <- scalar*this(name,:,:)
   int Scale(const std::string& name, double scalar);
 
@@ -263,7 +263,7 @@ public:
 
   // this <- element wise reciprocal(this)
   int Reciprocal(const CompositeVector& other);
-  
+
   // result <- other \dot this
   int Dot(const CompositeVector& other, double* result) const;
 
@@ -321,9 +321,9 @@ public:
   void ApplyVandelay_() const;
 
   // Tpetra vector accessors
-  const MultiVector_type&
+  const MultiVector_type<double>&
   GetComponent_(const std::string& name, bool ghosted=false) const;
-  MultiVector_type&
+  MultiVector_type<double>&
   GetComponent_(const std::string& name, bool ghosted=false);
 
  private:
@@ -343,7 +343,7 @@ public:
 
   // importer and vector for boundary data
   mutable Import_ptr_type vandelay_importer_;
-  mutable MultiVector_ptr_type vandelay_vector_;
+  mutable MultiVector_ptr_type<double> vandelay_vector_;
 };
 
 
@@ -366,13 +366,13 @@ CompositeVector::PutScalarMasterAndGhosted(double scalar) {
 //     using Range_type = Kokkos::MDRangePolicy<Kokkos::DefaultExecutionSpace, int>;
 //     /*
 //     auto vec = ViewComponent(names_[lcv_comp], true);
-//     Kokkos::parallel_for("PutScalarGhosted", Range_type(size_owned, size_ghosted), 
+//     Kokkos::parallel_for("PutScalarGhosted", Range_type(size_owned, size_ghosted),
 // 			 [=] (const int& i) { vec(i) = scalar; })
 //     */
 //     auto vec = ViewComponent(names_[lcv_comp], true);
 //     auto vec_ghost_view = Kokkos::subview(vec, std::make_pair(size_owned, size_ghosted), Kokkos::ALL());
-//     Kokkos::parallel_for("PutScalarGhosted", Range_type(0, size_ghosted - size_owned), 
-    
+//     Kokkos::parallel_for("PutScalarGhosted", Range_type(0, size_ghosted - size_owned),
+
 
 //   }
 //   return 0;

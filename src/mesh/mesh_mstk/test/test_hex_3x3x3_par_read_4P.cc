@@ -15,7 +15,7 @@ TEST(MSTK_HEX_3x3x3_PAR_READ_4P)
 {
 
   int i, j, k, err, nc, nf, nv;
-  std::vector<Amanzi::AmanziMesh::Entity_ID> faces(6), nodes(8);
+  Amanzi::AmanziMesh::Entity_ID_List faces(6), nodes(8);
   std::vector<Amanzi::AmanziGeometry::Point> ccoords(8), fcoords(4);
 
   auto comm = Amanzi::getDefaultComm();
@@ -38,7 +38,7 @@ TEST(MSTK_HEX_3x3x3_PAR_READ_4P)
   Teuchos::RCP<Amanzi::AmanziMesh::Mesh> mesh(new Amanzi::AmanziMesh::Mesh_MSTK("test/hex_3x3x3_split.par",comm));
 
 
-  std::vector<Amanzi::AmanziMesh::Entity_ID>  c2f(6);
+  Amanzi::AmanziMesh::Entity_ID_List  c2f(6);
   auto cell_map = mesh->cell_map(false);
   auto face_map = mesh->face_map(true);
 
@@ -70,6 +70,5 @@ TEST(MSTK_HEX_3x3x3_PAR_READ_4P)
   auditor.Verify();
 
 
-  
-}
 
+}

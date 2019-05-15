@@ -114,7 +114,7 @@ typedef Teuchos::RCP<const BlockMap_type> BlockMap_ptr_type;
 typedef Teuchos::RCP<const Import_type> Import_ptr_type;
 typedef Teuchos::RCP<const CrsGraph_type> CrsGraph_ptr_type;
 
-// non-const
+// non-consts
 template<typename T>
 using Vector_ptr_type = Teuchos::RCP<Vector_type<T>>;
 template<typename T>

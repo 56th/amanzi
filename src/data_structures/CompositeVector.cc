@@ -201,7 +201,7 @@ CompositeVector& CompositeVector::operator=(const CompositeVector& other) {
 // -- Access a view of a single component's data.
 // Ghosted views are simply the vector itself, while non-ghosted views are
 // lazily generated.
-const MultiVector_type&
+const MultiVector_type<double>&
 CompositeVector::GetComponent_(const std::string& name, bool ghosted) const {
   if (name == std::string("boundary_face")) {
     if (!mastervec_->HasComponent("boundary_face") &&
@@ -218,7 +218,7 @@ CompositeVector::GetComponent_(const std::string& name, bool ghosted) const {
 };
 
 
-MultiVector_type&
+MultiVector_type<double>&
 CompositeVector::GetComponent_(const std::string& name, bool ghosted) {
   if (name == std::string("boundary_face")) {
     if (!mastervec_->HasComponent("boundary_face") &&
@@ -353,7 +353,7 @@ void CompositeVector::GatherGhostedToMaster(const std::string& name,
 // Vandelay operations
 void CompositeVector::CreateVandelay_() const {
   vandelay_importer_ = Mesh()->exterior_face_importer();
-  vandelay_vector_ = Teuchos::rcp(new MultiVector_type(Mesh()->exterior_face_map(false), mastervec_->NumVectors("face"), true));
+  vandelay_vector_ = Teuchos::rcp(new MultiVector_type<double>(Mesh()->exterior_face_map(false), mastervec_->NumVectors("face"), true));
 }
 
 void CompositeVector::ApplyVandelay_() const {
@@ -388,7 +388,7 @@ int CompositeVector::Dot(const CompositeVector& other, double* result) const {
       int ierr = ViewComponent(*lcv, false)->Dot(*other.ViewComponent(*lcv,false),
                                                  &intermediate_result[0]);
       if (ierr) return ierr;
-      
+
       for (int lcv_vector = 0; lcv_vector != NumVectors(*lcv); ++lcv_vector) {
         tmp_result += intermediate_result[lcv_vector];
       }
@@ -507,7 +507,7 @@ int CompositeVector::Multiply(double scalarAB, const CompositeVector& A,
 //     const MultiVector_type& comp = *ViewComponent(names_[n]);
 
 //     for (int i = 0; i != comp.NumVectors(); ++i) {
-//       ni = comp(i)->GlobalLength(); 
+//       ni = comp(i)->GlobalLength();
 //       comp(i)->MeanValue(value_loc);
 //       tmp += value_loc[0] * ni;
 //       nt += ni;
@@ -552,7 +552,7 @@ int CompositeVector::Multiply(double scalarAB, const CompositeVector& A,
 
 //       int f_gid = fb_map.GID(fb);
 //       int f_lid = f_map.LID(f_gid);
-      
+
 //       cv.Mesh()->face_get_cells(f_lid, AmanziMesh::Parallel_type::ALL, &cells);
 //       int ncells = cells.size();
 
@@ -590,4 +590,3 @@ int CompositeVector::Multiply(double scalarAB, const CompositeVector& A,
 // }
 
 } // namespace
-

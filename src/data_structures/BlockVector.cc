@@ -1,7 +1,7 @@
 /*
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Ethan Coon (ecoon@lanl.gov)
@@ -16,7 +16,7 @@
   communicate itself.
 
 */
-  
+
 #include <numeric>
 #include "AmanziComm.hh"
 #include "AmanziMap.hh"
@@ -68,7 +68,7 @@ BlockVector::BlockVector(const BlockVector& other) :
 
   data_.resize(num_components_);
   for (int i=0; i != num_components_; ++i) {
-    data_[i] = Teuchos::rcp(new MultiVector_type(*other.data_[i], Teuchos::Copy));
+    data_[i] = Teuchos::rcp(new MultiVector_type<double>(*other.data_[i], Teuchos::Copy));
   }
 };
 
@@ -127,21 +127,21 @@ void BlockVector::CreateData() {
 
   // create the data
   for (int i = 0; i != num_components_; ++i) {
-    data_[i] = Teuchos::rcp(new MultiVector_type(maps_[i], num_dofs_[i], true));
+    data_[i] = Teuchos::rcp(new MultiVector_type<double>(maps_[i], num_dofs_[i], true));
   }
 };
 
 
 // View data, const version.
 // I would prefer these be private, but for now...
-Teuchos::RCP<const MultiVector_type>
+Teuchos::RCP<const MultiVector_type<double>>
 BlockVector::GetComponent(std::string name) const {
   return data_[Index_(name)];
 }
 
 
 // View data, non-const version.
-MultiVector_ptr_type
+MultiVector_ptr_type<double>
 BlockVector::GetComponent(std::string name) {
   return data_[Index_(name)];
 };
@@ -149,7 +149,7 @@ BlockVector::GetComponent(std::string name) {
 
 // Set data
 void BlockVector::SetComponent(std::string name,
-                                 const MultiVector_ptr_type& data) {
+                                 const MultiVector_ptr_type<double>& data) {
   AMANZI_ASSERT(ComponentMap(name)->isSameAs(*data->getMap()));
   AMANZI_ASSERT(NumVectors(name) == data->getNumVectors());
   data_[Index_(name)] = data;
@@ -380,7 +380,7 @@ int BlockVector::Norm2(double* norm) const {
 
 //   *value = 0.0;
 //   for (int i = 0; i != num_components_; ++i) {
-//     n_loc = data_[i]->GlobalLength(); 
+//     n_loc = data_[i]->GlobalLength();
 //     for (int lcv_vector = 0; lcv_vector != data_[i]->NumVectors(); ++lcv_vector) {
 //       ierr = (*data_[i])(lcv_vector)->MeanValue(value_loc);
 //       if (ierr) return ierr;
@@ -409,7 +409,7 @@ void BlockVector::Print(std::ostream& os, bool data_io) const {
 };
 
 
-// Populate by random numbers between -1 and 1. 
+// Populate by random numbers between -1 and 1.
 int BlockVector::Random() {
   for (int i = 0; i != num_components_; ++i) {
     data_[i]->randomize();
@@ -419,4 +419,3 @@ int BlockVector::Random() {
 
 
 } // namespace
-

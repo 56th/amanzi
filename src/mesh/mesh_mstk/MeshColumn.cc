@@ -23,7 +23,6 @@ MeshColumn::MeshColumn(const Teuchos::RCP<const Mesh>& parent_mesh,
     column_id_(column_id)
 {
   Entity_ID_List cells_column;
-  std::cout<<"Calling cells of column"<<std::endl;
   parent_mesh_->cells_of_column(column_id_,cells_column);
   extracted_ =  Teuchos::rcp(
       new Mesh_MSTK(parent_mesh, cells_column, CELL, false,
@@ -103,7 +102,8 @@ void MeshColumn::compute_special_node_coordinates_() {
   extracted_->build_columns();
 
   // Get the ordered face indexes of the column
-  const Entity_ID_List& colfaces = extracted_->faces_of_column(0);
+  Entity_ID_List colfaces;
+  extracted_->faces_of_column(0,colfaces);
   column_faces_ = colfaces;
 
   // mask for face index in the column of faces

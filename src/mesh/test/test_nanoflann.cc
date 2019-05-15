@@ -2,17 +2,18 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "MeshDefs.hh"
-
 #include "UnitTest++.h"
 #include "nanoflann.hpp"
 
+#include "Mesh.hh"
 #include "KDTree.hh"
 #include "Point.hh"
 
 typedef nanoflann::KDTreeSingleIndexAdaptor<
     nanoflann::L2_Adaptor<double, Amanzi::AmanziMesh::PointCloud>,
     Amanzi::AmanziMesh::PointCloud, -1> MyKDTree;
+
+using namespace Amanzi;
 
 TEST(NANOFLANN) {
   // generate points
@@ -21,19 +22,23 @@ TEST(NANOFLANN) {
   double query_pt[2] = {0.5, 0.5};
   Amanzi::AmanziGeometry::Point p(0.5, 0.5);
 
-  Map_type map();
-  Vector_ptr_type points = Teuchos::rcp(new Vector_type());
+  Teuchos::RCP<const Teuchos::MpiComm<int>> comm_;
+
+  Map_ptr_type map = Teuchos::rcp(new Map_type(
+        n,0,comm_,Tpetra::LocallyReplicated));
+  Vector_ptr_type<Amanzi::AmanziGeometry::Point> points =
+    Teuchos::rcp(new Vector_type<Amanzi::AmanziGeometry::Point>(map));
 
   for (int i = 0; i < n; ++i) {
     double x = range * (rand() % 1000) / 1000.0;
     double y = range * (rand() % 1000) / 1000.0;
-    points.push_back(Amanzi::AmanziGeometry::Point(x, y));
+    points->get1dViewNonConst()[i] = Amanzi::AmanziGeometry::Point(x, y);
   }
 
   std::cout << "Input points:\n";
   for (int i = 0; i < n; i++) {
-    double dist = Amanzi::AmanziGeometry::norm(points[i] - p);
-    std::cout << " " << i << " " << points[i] << " dist=" << dist << std::endl;
+    double dist = Amanzi::AmanziGeometry::norm(points->get1dView()[i] - p);
+    std::cout << " " << i << " " << points->get1dView()[i] << " dist=" << dist << std::endl;
   }
 
   // construct a kd-tree index:
@@ -58,8 +63,8 @@ TEST(NANOFLANN) {
   for (int i = 0; i < nresults; i++) {
     int n = idx[i];
     double dist = std::pow(dist_sqr[i], 0.5);
-    std::cout << " point: " << n << " dist=" << dist << " xy=" << points[n] << std::endl;
-    CHECK_CLOSE(dist, Amanzi::AmanziGeometry::norm(points[n] - p), 1e-14);
+    std::cout << " point: " << n << " dist=" << dist << " xy=" << points->get1dView()[n] << std::endl;
+    CHECK_CLOSE(dist, Amanzi::AmanziGeometry::norm(points->get1dView()[n] - p), 1e-14);
   }
 
   // SEARCH 2: points is a ball
@@ -75,7 +80,7 @@ TEST(NANOFLANN) {
   for (int i = 0; i < nresults; ++i) {
     int n = matches[i].first;
     double dist = std::pow(matches[i].second, 0.5);
-    std::cout << " point: " << n << " dist=" << dist << " xy=" << points[n] << std::endl;
-    CHECK_CLOSE(dist, Amanzi::AmanziGeometry::norm(points[n] - p), 1e-14);
+    std::cout << " point: " << n << " dist=" << dist << " xy=" << points->get1dView()[n] << std::endl;
+    CHECK_CLOSE(dist, Amanzi::AmanziGeometry::norm(points->get1dView()[n] - p), 1e-14);
   }
 }
