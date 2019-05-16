@@ -846,7 +846,8 @@ protected:
   int compute_face_geometry_(const Entity_ID faceid,
                              double *area,
                              AmanziGeometry::Point *centroid,
-                             std::vector<AmanziGeometry::Point> *normals) const;
+                             Teuchos::Array<AmanziGeometry::Point> *normals,
+                             Teuchos::Array<Entity_ID>* cellinds) const;
 
   virtual
   int compute_edge_geometry_(const Entity_ID edgeid,
@@ -868,42 +869,26 @@ protected:
   bool logical_;
   Teuchos::RCP<const Mesh> parent_;
 
-  // -- The Tpetra local map
-  mutable Map_ptr_type localMap_edge_;
-  mutable Map_ptr_type localMap_face_;
-  mutable Map_ptr_type localMap_cell_;
-
   // the cache
   // -- geometry
   mutable Vector_ptr_type<double> cell_volumes_, face_areas_, edge_lengths_;
-  //mutable Tpetra::Vector<AmanziGeometry::Point> cell_centroids_,
-  //                                              face_centroids_;
-
-  /// NOT DONE YET
-  //mutable Tpetra::Vector<AmanziGeometry::Point> cell_centroids_;
   mutable Vector_ptr_type<AmanziGeometry::Point> cell_centroids_, face_centroids_;
   mutable Vector_ptr_type<AmanziGeometry::Point> edge_vectors_;
   mutable Vector_type<Entity_ID> cell_cellabove_, cell_cellbelow_;
+  mutable CrsMatrix_ptr_type<Entity_ID> column_cells_;
+  mutable CrsMatrix_ptr_type<AmanziGeometry::Point> face_normals_;
+
+  // -- column information, only created if columns are requested
+  mutable Entity_ID_List node_nodeabove_;
+  mutable Entity_ID_List columnID_;
 
   // -- Have to account for the fact that a "face" for a non-manifold
   // surface mesh can have more than one cell connected to
   // it. Therefore, we have to store as many normals for a face as
   // there are cells connected to it. For a given face, its normal to
   // face_get_cells()[i] is face_normals_[i]
-  mutable std::vector<std::vector<AmanziGeometry::Point>> face_normals_;
-
-
-  // -- column information, only created if columns are requested
-  mutable Entity_ID_List node_nodeabove_;
-
-  mutable CrsMatrix_ptr_type<Entity_ID> column_cells_;
   //mutable std::vector<Entity_ID_List> column_cells_;
   mutable std::vector<Entity_ID_List> column_faces_;
-  mutable Entity_ID_List columnID_;
-
-  mutable int num_owned_cols_;
-  mutable bool columns_built_;
-
   // -- topology
   mutable std::vector<Entity_ID_List> cell_face_ids_;
   mutable std::vector< std::vector<int> > cell_face_dirs_;  // 1 or -1
@@ -918,6 +903,11 @@ protected:
   mutable std::vector<Entity_ID_List> face_edge_ids_;
   mutable std::vector< std::vector<int> > face_edge_dirs_;
 
+
+
+
+  mutable int num_owned_cols_;
+  mutable bool columns_built_;
   // -- flags to indicate what part of cache is up-to-date
   mutable bool cell2face_info_cached_, face2cell_info_cached_;
   mutable bool cell2edge_info_cached_, face2edge_info_cached_;

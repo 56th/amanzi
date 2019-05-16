@@ -449,14 +449,9 @@ int
 Mesh::compute_cell_geometric_quantities_() const
 {
   int ncells = num_entities(CELL,Parallel_type::ALL);
-  // Resize the map
-  localMap_cell_ = Teuchos::rcp(new Map_type(
-        ncells,0,comm_,Tpetra::LocallyReplicated));
 
-  cell_volumes_ = Teuchos::rcp(new Vector_type<double>(localMap_cell_));
-  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(localMap_cell_,0));
-  //cell_centroids_.resize(ncells);
-  cell_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(localMap_cell_));
+  cell_volumes_ = Teuchos::rcp(new Vector_type<double>(map(CELL,false)));
+  cell_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(map(CELL,false)));
 
   for (int i = 0; i < ncells; i++) {
     double volume;
@@ -465,7 +460,6 @@ Mesh::compute_cell_geometric_quantities_() const
     compute_cell_geometry_(i,&volume,&centroid);
 
     cell_volumes_->get1dViewNonConst()[i] = volume;
-    //cell_centroids_.get1dViewNonConst()[i] = centroid;
     cell_centroids_->get1dViewNonConst()[i] = centroid;
   }
 
@@ -485,29 +479,27 @@ Mesh::compute_face_geometric_quantities_() const
   }
   int nfaces = num_entities(FACE,Parallel_type::ALL);
 
-  localMap_face_ = Teuchos::rcp(new Map_type(
-        nfaces,0,comm_,Tpetra::LocallyReplicated));
 
-  face_areas_ = Teuchos::rcp(new Vector_type<double>(localMap_face_));
-  face_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(localMap_face_));
-  face_normals_.resize(nfaces);
+  face_areas_ = Teuchos::rcp(new Vector_type<double>(map(FACE,false)));
+  face_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(map(FACE,false)));
+  face_normals_ = Teuchos::rcp(new CrsMatrix_type<AmanziGeometry::Point>(map(FACE,false),0));
 
   for (int i = 0; i < nfaces; i++) {
     double area;
     AmanziGeometry::Point centroid(space_dim_);
-    std::vector<AmanziGeometry::Point> normals;
-
+    Teuchos::Array<AmanziGeometry::Point> normals;
+    Teuchos::Array<Entity_ID> cellinds;
     // normal0 and normal1 are outward normals of the face with
     // respect to the cell0 and cell1 of the face. The natural normal
     // of the face points out of cell0 and into cell1. If one of these
     // cells do not exist, then the normal is the null vector.
-    compute_face_geometry_(i, &area, &centroid, &normals);
-
+    compute_face_geometry_(i, &area, &centroid, &normals, &cellinds);
     face_areas_->get1dViewNonConst()[i] = area;
     face_centroids_->get1dViewNonConst()[i] = centroid;
-    face_normals_[i] = normals;
+    face_normals_->insertGlobalValues(i,cellinds,normals);
   }
 
+  face_normals_->fillComplete();
   face_geometry_precomputed_ = true;
   return 1;
 }
@@ -517,11 +509,9 @@ int
 Mesh::compute_edge_geometric_quantities_() const
 {
   int nedges = num_entities(EDGE,Parallel_type::ALL);
-  localMap_edge_ = Teuchos::rcp(new Map_type(
-        nedges,0,comm_,Tpetra::LocallyReplicated));
 
-  edge_lengths_ = Teuchos::rcp(new Vector_type<double>(localMap_edge_));
-  edge_vectors_ = Teuchos::rcp(new Vector_type<Amanzi::AmanziGeometry::Point>(localMap_edge_));
+  edge_lengths_ = Teuchos::rcp(new Vector_type<double>(map(EDGE,false)));
+  edge_vectors_ = Teuchos::rcp(new Vector_type<Amanzi::AmanziGeometry::Point>(map(EDGE,false)));
 
   for (int i = 0; i < nedges; i++) {
     double length;
@@ -627,7 +617,8 @@ Mesh::compute_cell_geometry_(const Entity_ID cellid, double *volume,
 int
 Mesh::compute_face_geometry_(const Entity_ID faceid, double *area,
                              AmanziGeometry::Point *centroid,
-                             std::vector<AmanziGeometry::Point> *normals) const
+                             Teuchos::Array<AmanziGeometry::Point> *normals,
+                             Teuchos::Array<Entity_ID> *cellinds) const
 {
   AmanziGeometry::Point_List fcoords;
   normals->clear();
@@ -645,6 +636,7 @@ Mesh::compute_face_geometry_(const Entity_ID faceid, double *area,
     AMANZI_ASSERT(cellids.size() <= 2);
 
     normals->resize(cellids.size(), AmanziGeometry::Point(0.0, 0.0, 0.0));
+    *cellinds = cellids;
     for (int i = 0; i < cellids.size(); i++) {
       Entity_ID_List cellfaceids;
       std::vector<int> cellfacedirs;
@@ -684,6 +676,7 @@ Mesh::compute_face_geometry_(const Entity_ID faceid, double *area,
       AMANZI_ASSERT(cellids.size() <= 2);
 
       normals->resize(cellids.size(), AmanziGeometry::Point(0.0, 0.0));
+      *cellinds = cellids;
       for (int i = 0; i < cellids.size(); i++) {
         Entity_ID_List cellfaceids;
         std::vector<int> cellfacedirs;
@@ -725,6 +718,7 @@ Mesh::compute_face_geometry_(const Entity_ID faceid, double *area,
       face_get_cells(faceid, Parallel_type::ALL, &cellids);
 
       normals->resize(cellids.size(), AmanziGeometry::Point(0.0, 0.0, 0.0));
+      *cellinds = cellids;
       for (int i = 0; i < cellids.size(); i++) {
         Entity_ID_List cellfaceids;
         std::vector<int> cellfacedirs;
@@ -745,9 +739,7 @@ Mesh::compute_face_geometry_(const Entity_ID faceid, double *area,
 
         AmanziGeometry::Point cvec =
         fcoords[0]-cell_centroids_->get1dView()[cellids[i]];
-        //fcoords[0]-cell_centroids_.get1dView()[cellids[i]];
         AmanziGeometry::Point trinormal = cvec^evec;
-
         AmanziGeometry::Point normal = evec^trinormal;
 
         double len = norm(normal);
@@ -821,8 +813,9 @@ double Mesh::face_area(const Entity_ID faceid, const bool recompute) const
     if (recompute) {
       double area;
       AmanziGeometry::Point centroid(space_dim_);
-      std::vector<AmanziGeometry::Point> normals;
-      compute_face_geometry_(faceid, &area, &centroid, &normals);
+      Teuchos::Array<AmanziGeometry::Point> normals;
+      Teuchos::Array<Entity_ID> cellinds;
+      compute_face_geometry_(faceid, &area, &centroid, &normals,&cellinds);
       return area;
     }
     else{
@@ -863,7 +856,6 @@ Mesh::cell_centroid(const Entity_ID cellid,
 {
   if (!cell_geometry_precomputed_) {
     compute_cell_geometric_quantities_();
-    //return cell_centroids_.get1dView()[cellid];
     return cell_centroids_->get1dView()[cellid];
   }
   else {
@@ -874,7 +866,6 @@ Mesh::cell_centroid(const Entity_ID cellid,
       return centroid;
     }
     else
-    //return cell_centroids_.get1dView()[cellid];
     return cell_centroids_->get1dView()[cellid];
   }
 }
@@ -894,8 +885,9 @@ Mesh::face_centroid(const Entity_ID faceid, const bool recompute) const
     if (recompute) {
       double area;
       AmanziGeometry::Point centroid(space_dim_);
-      std::vector<AmanziGeometry::Point> normals;
-      compute_face_geometry_(faceid, &area, &centroid, &normals);
+      Teuchos::Array<AmanziGeometry::Point> normals;
+      Teuchos::Array<Entity_ID> cellinds;
+      compute_face_geometry_(faceid, &area, &centroid, &normals,&cellinds);
       return centroid;
     }
     else
@@ -942,27 +934,35 @@ Mesh::face_normal(const Entity_ID faceid,
                   int *orientation) const
 {
   AMANZI_ASSERT(faces_requested_);
-
-  std::vector<AmanziGeometry::Point> *fnormals = nullptr;
-  std::vector<AmanziGeometry::Point> fnormals_new;
+  Teuchos::Array<AmanziGeometry::Point> fnormals;
+  Teuchos::Array<AmanziGeometry::Point> fnormals_new;
 
   if (!face_geometry_precomputed_) {
     compute_face_geometric_quantities_();
-
-    fnormals = &(face_normals_[faceid]);
+    size_t numEntriesInRow = face_normals_->getNumEntriesInGlobalRow(faceid);
+    Entity_ID_List rowinds(numEntriesInRow);
+    fnormals = Teuchos::Array<AmanziGeometry::Point> (numEntriesInRow);
+    face_normals_->getGlobalRowCopy(faceid,rowinds(),fnormals(),
+      numEntriesInRow);
   }
   else {
     if (recompute) {
       double area;
       AmanziGeometry::Point centroid(space_dim_);
-      compute_face_geometry_(faceid, &area, &centroid, &fnormals_new);
-      fnormals = &fnormals_new;
+      Teuchos::Array<Entity_ID> cellinds;
+      compute_face_geometry_(faceid, &area, &centroid, &fnormals_new,&cellinds);
+      fnormals = fnormals_new;
     }
-    else
-      fnormals = &(face_normals_[faceid]);
+    else{
+      size_t numEntriesInRow = face_normals_->getNumEntriesInGlobalRow(faceid);
+      Entity_ID_List rowinds(numEntriesInRow);
+      fnormals = Teuchos::Array<AmanziGeometry::Point> (numEntriesInRow);
+      face_normals_->getGlobalRowCopy(faceid,rowinds(),fnormals(),
+        numEntriesInRow);
+    }
   }
 
-  AMANZI_ASSERT(fnormals->size() > 0);
+  AMANZI_ASSERT(fnormals.size() > 0);
 
   if (cellid == -1) {
     // Return the natural normal. This is the normal with respect to
@@ -970,7 +970,7 @@ Mesh::face_normal(const Entity_ID faceid,
     // face is pointing into the cell (-ve cell id) or out
 
     int c = face_cell_ids_[faceid][0];
-    return std::signbit(c) ? -(*fnormals)[0] : (*fnormals)[0];
+    return std::signbit(c) ? -fnormals[0] : fnormals[0];
   } else {
     // Find the index of 'cellid' in list of cells connected to face
 
@@ -986,7 +986,7 @@ Mesh::face_normal(const Entity_ID faceid,
     }
     AMANZI_ASSERT(irefcell < nfc);
     if (orientation) *orientation = dir;  // if orientation was requested
-    return (*fnormals)[irefcell];
+    return fnormals[irefcell];
   }
 }
 
@@ -1415,8 +1415,8 @@ Mesh::build_columns(const std::string& setname) const
   int nc_owned = num_entities(CELL,Parallel_type::OWNED);
 
   columnID_.resize(nc);
-  cell_cellbelow_ = Vector_type<Entity_ID>(localMap_cell_);
-  cell_cellabove_ = Vector_type<Entity_ID>(localMap_cell_);
+  cell_cellbelow_ = Vector_type<Entity_ID>(map(CELL,false));
+  cell_cellabove_ = Vector_type<Entity_ID>(map(CELL,false));
   for(int i = 0 ; i < nc; ++i){
     cell_cellbelow_.replaceGlobalValue(i,-1);
     cell_cellabove_.replaceGlobalValue(i,-1);
@@ -1490,16 +1490,12 @@ Mesh::build_columns() const
   int nc_owned = num_entities(CELL, Parallel_type::OWNED);
 
   // Generate the structure
-  localMap_cell_ = Teuchos::rcp(new Map_type(
-        nc,0,comm_,Tpetra::LocallyReplicated));
-  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(localMap_cell_,0));
+  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map(CELL,false),0));
 
   columnID_.resize(nc);
 
-  //localMap_cell_ = Teuchos::rcp(new Map_type(
-  //      nc,0,comm_,Tpetra::LocallyReplicated));
-  cell_cellbelow_ = Vector_type<Entity_ID>(localMap_cell_);
-  cell_cellabove_ = Vector_type<Entity_ID>(localMap_cell_);
+  cell_cellbelow_ = Vector_type<Entity_ID>(map(CELL,false));
+  cell_cellabove_ = Vector_type<Entity_ID>(map(CELL,false));
   for(int i = 0 ; i < nc; ++i){
     cell_cellbelow_.replaceGlobalValue(i,-1);
     cell_cellabove_.replaceGlobalValue(i,-1);

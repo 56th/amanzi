@@ -40,7 +40,8 @@ class Point {
     d = p.d;
     std::copy(p.xyz, p.xyz+d, xyz);
   }
-  explicit Point(const int N) {
+
+  Point(const int N) {
     d = N;
     xyz[0] = xyz[1] = xyz[2] = 0.0;    
   }
@@ -100,14 +101,16 @@ class Point {
 
   int dim() const { return d; }
 
-  static inline Point nan(){
-    return Point(std::nan(""),std::nan(""),std::nan(""));
-  }
 
   // operators
   Point& operator=(const Point& p) {
     d = p.d;
     std::copy(p.xyz, p.xyz+d, xyz);
+    return *this;
+  }
+
+  Point& operator=(const double& c) {
+    xyz[0] = xyz[1] = xyz[2] = c;
     return *this;
   }
 
@@ -117,14 +120,6 @@ class Point {
     return *this;
   }
 
-  Point& operator+=(const Point& p) {
-    for (int i = 0; i < d; i++) xyz[i] += p[i];
-    return *this;
-  }
-  Point& operator-=(const Point& p) {
-    for (int i = 0; i < d; i++) xyz[i] -= p[i];
-    return *this;
-  }
   Point& operator*=(const double& c) {
     for (int i = 0; i < d; i++) xyz[i] *= c;
     return *this;
@@ -133,17 +128,59 @@ class Point {
     for (int i = 0; i < d; i++) xyz[i] /= c;
     return *this;
   }
+  Point& operator+=(const double& c) {
+    for (int i = 0; i < d; i++) xyz[i] += c;
+    return *this;
+  }
+  Point& operator-=(const double& c) {
+    for (int i = 0; i < d; i++) xyz[i] -= c;
+    return *this;
+  }
+
+  Point& operator*=(const Point& p) {
+    for (int i = 0; i < d; i++) xyz[i] *= p.xyz[i];
+    return *this;
+  }
+
+  Point& operator+=(const Point& p) {
+    for (int i = 0; i < d; i++) xyz[i] += p.xyz[i];
+    return *this;
+  }
+  Point& operator/=(const Point& p) {
+    for (int i = 0; i < d; i++) xyz[i] /= p.xyz[i];
+    return *this;
+  }
+  Point& operator-=(const Point& p) {
+    for (int i = 0; i < d; i++) xyz[i] -= p.xyz[i];
+    return *this;
+  }
 
   bool operator>(const Point&p) const {
     return xyz[0]>p.xyz[0] && xyz[1]>p.xyz[1] && xyz[2]>p.xyz[2];
   }
 
+  bool operator<(const Point&p) const {
+    return xyz[0]<p.xyz[0] && xyz[1]<p.xyz[1] && xyz[2]<p.xyz[2];
+  }
+
   friend Point operator*(const double& r, const Point& p) {
     return (p.d == 2) ? Point(r*p[0], r*p[1]) : Point(r*p[0], r*p[1], r*p[2]);
   }
-  friend Point operator*(const Point& p, const double& r) { return r*p; }
+
+  friend Point operator*(const Point& p, const double& r) {
+    return r*p;
+  }
+
+  friend Point operator+(const Point& p, const double& r) {
+    return r+p;
+  }
+
+  friend Point operator+(const double& r, const Point& p) {
+    return r+p;
+  }
+
   friend double operator*(const Point& p, const Point& q) {
-    double s = 0.0; 
+    double s = 0.0;
     for (int i = 0; i < p.d; i++ ) s += p[i]*q[i];
     return s;
   }
@@ -158,6 +195,9 @@ class Point {
   }
   friend Point operator-(const Point& p) {
     return (p.d == 2) ? Point(-p[0], -p[1]) : Point(-p[0], -p[1], -p[2]);
+  }
+  friend Point operator/(const Point& p, const Point& q) {
+    return (p.d == 2) ? Point(p[0]/q[0], p[1]/q[1]) : Point(p[0]/q[0], p[1]/q[1], p[2]/q[2]);
   }
 
   friend Point operator^(const Point& p, const Point& q) {
@@ -220,6 +260,24 @@ struct Kokkos::ArithTraits<Amanzi::AmanziGeometry::Point> {
       p[1]>=0?p[1]:-p[1],
       p[2]>=0?p[2]:-p[2]);
   }
+
+  static inline Point one(){
+    return Point(1,1,1);
+  }
+
+  static inline Point zero(){
+    return Point(0,0,0);
+  }
+
+  static inline Point conj(const Point& p){
+    return p;
+  }
+
+  static inline Point sqrt(const Point& p){
+    return Point(std::sqrt(p[0]),std::sqrt(p[1]),std::sqrt(p[2]));
+  }
+
+
 };
 
 
