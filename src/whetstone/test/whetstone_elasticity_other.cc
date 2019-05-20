@@ -40,14 +40,14 @@ TEST(DIFFUSION_STOKES_2D) {
 
   MeshFactory meshfactory(comm);
   meshfactory.set_preference(Preference({Framework::MSTK}));
-  // RCP<Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 1, 1); 
-  RCP<Mesh> mesh = meshfactory.create("test/one_pentagon.exo"); 
- 
+  // RCP<Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 1, 1);
+  RCP<Mesh> mesh = meshfactory.create("test/one_pentagon.exo");
+
   Teuchos::ParameterList plist;
   MFD3D_BernardiRaugel mfd(plist, mesh);
 
   AmanziMesh::Entity_ID_List nodes, faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   // extract single cell
   int cell(0);
@@ -68,7 +68,7 @@ TEST(DIFFUSION_STOKES_2D) {
 
   printf("Stiffness matrix for cell %3d\n", cell);
   for (int i = 0; i < nrows; i++) {
-    for (int j = 0; j < nrows; j++ ) printf("%7.4f ", A(i, j)); 
+    for (int j = 0; j < nrows; j++ ) printf("%7.4f ", A(i, j));
     printf("\n");
   }
 
@@ -98,7 +98,7 @@ TEST(DIFFUSION_STOKES_2D) {
     ay(2*nnodes + i) = xf[1] * normal[1] / area;
   }
 
-  double vxx(0.0), vxy(0.0); 
+  double vxx(0.0), vxy(0.0);
   double volume = mesh->cell_volume(cell);
 
   for (int i = 0; i < nrows; i++) {
@@ -110,7 +110,7 @@ TEST(DIFFUSION_STOKES_2D) {
   CHECK_CLOSE(vxx, volume, 1e-10);
   CHECK_CLOSE(vxy, 0.0, 1e-10);
 
-  
+
 }
 
 
@@ -129,15 +129,15 @@ TEST(ADVECTION_NAVIER_STOKES_2D) {
 
   MeshFactory meshfactory(comm);
   meshfactory.set_preference(Preference({Framework::MSTK}));
-  // RCP<Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 1, 1); 
-  RCP<Mesh> mesh = meshfactory.create("test/one_pentagon.exo"); 
- 
+  // RCP<Mesh> mesh = meshfactory.create(0.0, 0.0, 1.0, 1.0, 1, 1);
+  RCP<Mesh> mesh = meshfactory.create("test/one_pentagon.exo");
+
   Teuchos::ParameterList plist;
   MFD3D_BernardiRaugel mfd(plist, mesh);
 
   // extract single cell
   int cell(0);
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
   AmanziMesh::Entity_ID_List nodes, faces;
 
   mesh->cell_get_nodes(cell, &nodes);
@@ -158,8 +158,7 @@ TEST(ADVECTION_NAVIER_STOKES_2D) {
 
   printf("Advection matrix for cell %3d\n", cell);
   for (int i = 0; i < 2*nnodes; i++) {
-    for (int j = 0; j < 2*nnodes; j++ ) printf("%8.5f ", A(i, j)); 
+    for (int j = 0; j < 2*nnodes; j++ ) printf("%8.5f ", A(i, j));
     printf("\n");
   }
 }
-

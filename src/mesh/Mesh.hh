@@ -265,7 +265,7 @@ class Mesh {
   // direction as the cell polygon, and -1 otherwise
   void cell_get_faces_and_dirs(const Entity_ID cellid,
                                Entity_ID_List *faceids,
-                               std::vector<int> *face_dirs,
+                               Teuchos::Array<int> *face_dirs,
                                const bool ordered=false) const;
 
   // Get the bisectors, i.e. vectors from cell centroid to face centroids.
@@ -286,7 +286,7 @@ class Mesh {
   // normals, rotate them and then get a consistent edge vector)
   void cell_2D_get_edges_and_dirs(const Entity_ID cellid,
                                   Entity_ID_List *edgeids,
-                                  std::vector<int> *edge_dirs) const;
+                                  Teuchos::Array<int> *edge_dirs) const;
 
   // Get nodes of a cell
   virtual
@@ -309,7 +309,7 @@ class Mesh {
   // integral around the 2D cell.
   void face_get_edges_and_dirs(const Entity_ID faceid,
                                Entity_ID_List *edgeids,
-                               std::vector<int> *edge_dirs,
+                               Teuchos::Array<int> *edge_dirs,
                                const bool ordered=false) const;
 
   // Get the local index of a face edge in a cell edge list
@@ -803,7 +803,7 @@ protected:
   virtual
   void cell_get_faces_and_dirs_internal_(const Entity_ID cellid,
                                          Entity_ID_List *faceids,
-                                         std::vector<int> *face_dirs,
+                                         Teuchos::Array<int> *face_dirs,
                                          const bool ordered=false) const = 0;
 
   // Cells connected to a face
@@ -817,7 +817,7 @@ protected:
   void face_get_edges_and_dirs_internal_(
       const Entity_ID faceid,
       Entity_ID_List *edgeids,
-      std::vector<int> *edge_dirs,
+      Teuchos::Array<int> *edge_dirs,
       const bool ordered=true) const = 0;
 
   // edges of a cell
@@ -830,7 +830,7 @@ protected:
   void cell_2D_get_edges_and_dirs_internal_(
       const Entity_ID cellid,
       Entity_ID_List *edgeids,
-      std::vector<int> *edge_dirs) const = 0;
+      Teuchos::Array<int> *edge_dirs) const = 0;
 
   // Virtual methods to fill the cache with geometric quantities.
   //
@@ -874,13 +874,23 @@ protected:
   mutable Vector_ptr_type<double> cell_volumes_, face_areas_, edge_lengths_;
   mutable Vector_ptr_type<AmanziGeometry::Point> cell_centroids_, face_centroids_;
   mutable Vector_ptr_type<AmanziGeometry::Point> edge_vectors_;
-  mutable Vector_type<Entity_ID> cell_cellabove_, cell_cellbelow_;
+  mutable Vector_ptr_type<Entity_ID> cell_cellabove_, cell_cellbelow_;
+
+  // -- column information, only created if columns are requested
+  mutable Vector_ptr_type<Entity_ID> node_nodeabove_;
+  mutable Vector_ptr_type<Entity_ID> columnID_;
+
   mutable CrsMatrix_ptr_type<Entity_ID> column_cells_;
   mutable CrsMatrix_ptr_type<AmanziGeometry::Point> face_normals_;
 
-  // -- column information, only created if columns are requested
-  mutable Entity_ID_List node_nodeabove_;
-  mutable Entity_ID_List columnID_;
+  mutable CrsMatrix_ptr_type<Entity_ID> column_faces_;
+  mutable CrsMatrix_ptr_type<int> cell_face_;
+  mutable CrsMatrix_ptr_type<Entity_ID> face_cell_ids_;
+
+  mutable CrsMatrix_ptr_type<int> cell_edge_ids_;
+  mutable CrsMatrix_ptr_type<int> cell_2D_edge_dirs_;
+
+  mutable CrsMatrix_ptr_type<int> face_edge_;
 
   // -- Have to account for the fact that a "face" for a non-manifold
   // surface mesh can have more than one cell connected to
@@ -888,21 +898,15 @@ protected:
   // there are cells connected to it. For a given face, its normal to
   // face_get_cells()[i] is face_normals_[i]
   //mutable std::vector<Entity_ID_List> column_cells_;
-  mutable std::vector<Entity_ID_List> column_faces_;
-  // -- topology
-  mutable std::vector<Entity_ID_List> cell_face_ids_;
-  mutable std::vector< std::vector<int> > cell_face_dirs_;  // 1 or -1
+  //mutable std::vector<Entity_ID_List> column_faces_;
+  //mutable std::vector<Entity_ID_List> cell_face_ids_;
+  //mutable std::vector< std::vector<int> > cell_face_dirs_;  // 1 or -1
 
   // 1s complement if face is pointing out of cell; cannot use 0 as
   // cellid can be 0
-  mutable std::vector<Entity_ID_List> face_cell_ids_;
+  //mutable std::vector<Entity_ID_List> face_cell_ids_;
 
   mutable std::vector< std::vector<Parallel_type> > face_cell_ptype_;
-  mutable std::vector<Entity_ID_List> cell_edge_ids_;
-  mutable std::vector< std::vector<int> > cell_2D_edge_dirs_;
-  mutable std::vector<Entity_ID_List> face_edge_ids_;
-  mutable std::vector< std::vector<int> > face_edge_dirs_;
-
 
 
 

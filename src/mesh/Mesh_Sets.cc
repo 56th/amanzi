@@ -1,15 +1,15 @@
 /*
   Mesh
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Authors: Lipnikov Konstantin (lipnikov@lanl.gov)
            Rao Garimella (rao@lanl.gov)
 
-  Implementation of algorithms independent of the actual mesh 
+  Implementation of algorithms independent of the actual mesh
   framework.
 */
 
@@ -45,7 +45,7 @@ void Mesh::get_set_entities_box_vofs_(
   int sdim = space_dimension();
   int mdim = region->manifold_dimension();
 
-  switch (kind) {      
+  switch (kind) {
   case CELL:
   {
     std::string name = region->name() + "_cell";
@@ -54,18 +54,18 @@ void Mesh::get_set_entities_box_vofs_(
       *setents = region_ids[name];
       *volume_fractions = region_vofs[name];
     } else {
-      int ncells = num_entities(CELL, ptype);  
+      int ncells = num_entities(CELL, ptype);
       double volume;
 
       Entity_ID_List faces, cnodes, fnodes;
-      std::vector<int> dirs;
+      Teuchos::Array<int> dirs;
       std::vector<AmanziGeometry::Point> polytope_nodes;
       std::vector<std::vector<int> > polytope_faces;
 
       for (int c = 0; c < ncells; ++c) {
         cell_get_coordinates(c, &polytope_nodes);
 
-        if (space_dimension() == 3) { 
+        if (space_dimension() == 3) {
           cell_get_nodes(c, &cnodes);
           cell_get_faces_and_dirs(c, &faces, &dirs);
           int nfaces = faces.size();
@@ -77,7 +77,7 @@ void Mesh::get_set_entities_box_vofs_(
             int nnodes = fnodes.size();
 
             for (int i = 0; i < nnodes; ++i) {
-              int j = (dirs[n] > 0) ? i : nnodes - i - 1; 
+              int j = (dirs[n] > 0) ? i : nnodes - i - 1;
               int pos = std::distance(cnodes.begin(), std::find(cnodes.begin(), cnodes.end(), fnodes[j]));
               polytope_faces[n].push_back(pos);
             }
@@ -107,7 +107,7 @@ void Mesh::get_set_entities_box_vofs_(
     } else {
       int nfaces = num_entities(FACE, ptype);
       double area;
-        
+
       std::vector<AmanziGeometry::Point> polygon;
 
       for (int f = 0; f < nfaces; ++f) {
@@ -127,7 +127,7 @@ void Mesh::get_set_entities_box_vofs_(
   case EDGE:
   {
     int nedges = num_entities(EDGE, ptype);
-        
+
     for (int e = 0; e < nedges; ++e) {
       if (region->inside(edge_centroid(e))) {
         setents->push_back(e);
@@ -139,7 +139,7 @@ void Mesh::get_set_entities_box_vofs_(
   case NODE:
   {
     int nnodes = num_entities(NODE, ptype);
-        
+
     AmanziGeometry::Point xv(space_dimension());
 
     for (int v = 0; v < nnodes; ++v) {
@@ -171,7 +171,7 @@ void Mesh::get_set_entities_box_vofs_(
 //---------------------------------------------------------
 unsigned int Mesh::get_set_size(const Set_ID setid,
                                 const Entity_kind kind,
-                                const Parallel_type ptype) const 
+                                const Parallel_type ptype) const
 {
   Entity_ID_List ents;
   std::string setname = geometric_model()->FindRegion(setid)->name();
@@ -182,22 +182,22 @@ unsigned int Mesh::get_set_size(const Set_ID setid,
 }
 
 
-unsigned int Mesh::get_set_size(const std::string setname, 
-                                const Entity_kind kind, 
-                                const Parallel_type ptype) const 
+unsigned int Mesh::get_set_size(const std::string setname,
+                                const Entity_kind kind,
+                                const Parallel_type ptype) const
 {
   Entity_ID_List setents;
   std::vector<double> vofs;
 
   get_set_entities_and_vofs(setname, kind, ptype, &setents, &vofs);
-  
+
   return setents.size();
 }
 
 
-void Mesh::get_set_entities(const Set_ID setid, 
-                            const Entity_kind kind, 
-                            const Parallel_type ptype, 
+void Mesh::get_set_entities(const Set_ID setid,
+                            const Entity_kind kind,
+                            const Parallel_type ptype,
                             Entity_ID_List *entids) const
 {
   std::vector<double> vofs;

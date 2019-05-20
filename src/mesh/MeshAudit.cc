@@ -571,7 +571,7 @@ bool MeshAudit::check_node_refs_by_faces() const
 bool MeshAudit::check_cell_to_face_dirs() const
 {
   AmanziMesh::Entity_ID_List faces;
-  vector<int> fdirs;
+  Teuchos::Array<int> fdirs;
   AmanziMesh::Entity_ID_List bad_cells, bad_cells_exc;
 
   for (AmanziMesh::Entity_ID j = 0; j < ncell; ++j) {
@@ -647,7 +647,7 @@ bool MeshAudit::check_cell_to_faces_to_nodes() const
   AmanziMesh::Entity_ID_List cface;
   AmanziMesh::Entity_ID_List fnode_ref;
   AmanziMesh::Entity_ID_List fnode;
-  vector<int> fdirs;
+  Teuchos::Array<int> fdirs;
   AmanziMesh::Entity_ID_List bad_cells0;
   AmanziMesh::Entity_ID_List bad_cells1;
 
@@ -657,8 +657,8 @@ bool MeshAudit::check_cell_to_faces_to_nodes() const
     // If this is a general, non-standard element there is nothing to
     // to check against
 
-    if (ctype == AmanziMesh::CELLTYPE_UNKNOWN || 
-	ctype == AmanziMesh::POLYGON || 
+    if (ctype == AmanziMesh::CELLTYPE_UNKNOWN ||
+	ctype == AmanziMesh::POLYGON ||
 	ctype == AmanziMesh::POLYHED)
       continue;
 
@@ -885,7 +885,7 @@ bool MeshAudit::check_cell_geometry() const
 
   for (AmanziMesh::Entity_ID j = 0; j < ncell; ++j) {
     hvol = mesh_->cell_volume(j);
-      
+
     if (hvol <= 0.0) bad_cells.push_back(j);
   }
 
@@ -1138,7 +1138,7 @@ bool MeshAudit::check_face_to_nodes_ghost_data() const
   //   mesh_->face_get_nodes(j, &fnode);
   //   bool bad_data = false;
   //   for (int k = 0; k < fnode.size(); ++k)
-  //     if (node_map->getGlobalElement(fnode[k]) != gids(j,k)) { 
+  //     if (node_map->getGlobalElement(fnode[k]) != gids(j,k)) {
   //       bad_data = true;
   //     }
   //   if (bad_data) {
@@ -1178,7 +1178,7 @@ bool MeshAudit::check_face_to_nodes_ghost_data() const
   //         std::cerr << fnode_ref[k];
   //       std::cerr << std::endl;
   //       break;
-  //     case 1:  
+  //     case 1:
   //       // This is fine because there is no way to ensure this for
   //       // general meshes (think of building a tet mesh and defining
   //       // the faces such that they return the same vertices in the
@@ -1216,7 +1216,7 @@ bool MeshAudit::check_cell_to_nodes_ghost_data() const
 {
   os_ << "WARNING: check_cell_to_nodes_ghost_data() test disabled in tpetra" << std::endl;
   return false;
-  
+
   // auto node_map = mesh_->node_map(true);
   // auto cell_map_own = mesh_->cell_map(false);
   // auto cell_map_use = mesh_->cell_map(true);
@@ -1561,9 +1561,9 @@ bool MeshAudit::check_sets(AmanziMesh::Entity_kind kind,
   //   os_ << "  Checking set ID=" << sids[n] << " ..." << std::endl;
 
   //   // Basic sanity checks of the owned and used sets.
-  //   bool bad_set = check_get_set(sids[n], kind, AmanziMesh::Parallel_type::OWNED, 
+  //   bool bad_set = check_get_set(sids[n], kind, AmanziMesh::Parallel_type::OWNED,
   //       			 map_own) ||
-  //                  check_get_set(sids[n], kind, AmanziMesh::Parallel_type::ALL,  
+  //                  check_get_set(sids[n], kind, AmanziMesh::Parallel_type::ALL,
   //       			 map_use);
   //   bad_set = global_any(bad_set);
 
@@ -1582,9 +1582,9 @@ bool MeshAudit::check_sets(AmanziMesh::Entity_kind kind,
 // to the map.  This test runs independently on each process and returns a
 // per-process pass/fail result.
 
-bool MeshAudit::check_get_set(AmanziMesh::Set_ID sid, 
+bool MeshAudit::check_get_set(AmanziMesh::Set_ID sid,
 			      AmanziMesh::Entity_kind kind,
-			      AmanziMesh::Parallel_type ptype, 
+			      AmanziMesh::Parallel_type ptype,
 			      const Map_ptr_type& map) const
 {
   os_ << "WARNING: Checks on sets disabled until MeshAudit handles new set specification methods (Tkt #686)" << std::endl;
@@ -1646,9 +1646,9 @@ bool MeshAudit::check_get_set(AmanziMesh::Set_ID sid,
 // presented in any order.  This is a collective test, returning a collective
 // pass/fail result.
 
-bool MeshAudit::check_used_set(AmanziMesh::Set_ID sid, 
+bool MeshAudit::check_used_set(AmanziMesh::Set_ID sid,
 			       AmanziMesh::Entity_kind kind,
-                               const Map_ptr_type& map_own, 
+                               const Map_ptr_type& map_own,
 			       const Map_ptr_type& map_use) const
 {
   os_ << "WARNING: Checks on sets disabled until MeshAudit handles new set specification methods (Tkt #686)" << std::endl;
@@ -1664,7 +1664,7 @@ bool MeshAudit::check_used_set(AmanziMesh::Set_ID sid,
   //   mesh_->get_set_entities(set_name, kind, AmanziMesh::Parallel_type::OWNED, &set_own);
 
   //   // Set sizes had better be the same.
-  //   if (mesh_->get_set_size(sid, kind, AmanziMesh::Parallel_type::ALL) != 
+  //   if (mesh_->get_set_size(sid, kind, AmanziMesh::Parallel_type::ALL) !=
   //       set_own.size()) {
   //     os_ << "  ERROR: owned and used set sizes differ" << std::endl;
   //     return true;
@@ -1831,10 +1831,10 @@ int MeshAudit::same_face(const AmanziMesh::Entity_ID_List fnode1, const AmanziMe
 
   if (nn == 2) {
     // These are edges in a 2D mesh
-    
+
     if (n == 0 && fnode1[1] == fnode2[1]) return 1;
     if (n == 1 && fnode1[0] == fnode2[1]) return -1;
-    
+
     if (n == 0 && fnode1[1] == fnode2[1]) return 1;
     if (n == 1 && fnode1[0] == fnode2[1]) return -1;
 
@@ -1845,7 +1845,7 @@ int MeshAudit::same_face(const AmanziMesh::Entity_ID_List fnode1, const AmanziMe
     if (i == nn) return 1;  // they match
 
     // Modify the permutation to reverse the orientation of fnode1.
-    
+
     for (i = 1; i < nn; ++i)
       if (fnode1[(n-i+nn)%nn] != fnode2[i]) break;
     if (i == nn) return -1;   // matched nodes but orientation is reversed

@@ -16,7 +16,7 @@ TEST(MSTK_HEX1)
 
   int i, j, k, err, nc, nv;
   Amanzi::AmanziMesh::Entity_ID_List faces(6), facenodes(4), cellnodes(8), expfacenodes(4);
-  std::vector<int> facedirs(6);
+  Teuchos::Array<int> facedirs(6);
   std::vector<Amanzi::AmanziGeometry::Point> ccoords(8), fcoords(4);
 
   int NV = 8;

@@ -20,13 +20,13 @@ static inline void write_mesh_to_file_(const AmanziMesh::Mesh &mesh, std::string
     mesh.node_get_coordinates(i, &xc);
     x[i] = xc[0];
     y[i] = xc[1];
-    if (dim == 3)  
+    if (dim == 3)
       z[i] = xc[2];
-    else 
+    else
       z[i] = 0.0;
   }
   gmvwrite_node_data(&num_nodes, x, y, z);
-  
+
   delete [] z;
   delete [] y;
   delete [] x;
@@ -55,7 +55,7 @@ static inline void write_mesh_to_file_(const AmanziMesh::Mesh &mesh, std::string
         gmvwrite_cell_type((char*) "phex8", 8, xh);
       } else {
         AmanziMesh::Entity_ID_List cfaces, fnodes;
-        std::vector<int> fdirs;
+        Teuchos::Array<int> fdirs;
 
         mesh.cell_get_faces_and_dirs(i, &cfaces, &fdirs);
         int nfaces = cfaces.size();
@@ -70,7 +70,7 @@ static inline void write_mesh_to_file_(const AmanziMesh::Mesh &mesh, std::string
     } else if (dim == 3 && dim_cell == 2) {
       gmvwrite_cell_type((char*) "general 1", nnodes, xh);
     } else if (dim == 2) {
-      if (nnodes == 4) 
+      if (nnodes == 4)
         gmvwrite_cell_type((char*) "quad", 4, xh);
       else
         gmvwrite_cell_type((char*) "general 1", nnodes, xh);
@@ -90,7 +90,7 @@ void create_mesh_file(const AmanziMesh::Mesh &mesh, std::string filename)
 }
 
 
-void open_data_file(std::string meshfile, std::string filename, unsigned int num_nodes, unsigned int num_cells) 
+void open_data_file(std::string meshfile, std::string filename, unsigned int num_nodes, unsigned int num_cells)
 {
   gmvwrite_openfile_ir_ascii((char*) filename.c_str(), 4, 8);
   gmvwrite_nodes_fromfile((char*) meshfile.c_str(), num_nodes);
@@ -98,7 +98,7 @@ void open_data_file(std::string meshfile, std::string filename, unsigned int num
 }
 
 
-void suffix_no(std::string &suffix, unsigned int cycleno) 
+void suffix_no(std::string &suffix, unsigned int cycleno)
 {
   unsigned int digits = suffix.length() - 1;
 
@@ -110,34 +110,34 @@ void suffix_no(std::string &suffix, unsigned int cycleno)
   // for (int i=1; i<digits; i++) {
   //   suffix[digits-i] = '0' + (cycleno/div)%div;
   //   div *=10;
-  // }  
+  // }
 
   int div = 1;
   for (int i = 0; i < digits; ++i) {
-    suffix[digits-i] = '0' + (cycleno/div) % 10; 
+    suffix[digits-i] = '0' + (cycleno/div) % 10;
     div *= 10;
   }
 }
-  
 
-void open_data_file(std::string meshfile, 
-                    std::string filename, 
-                    unsigned int num_nodes, 
-                    unsigned int num_cells, 
-                    unsigned int cycleno, 
-                    unsigned int digits) 
+
+void open_data_file(std::string meshfile,
+                    std::string filename,
+                    unsigned int num_nodes,
+                    unsigned int num_cells,
+                    unsigned int cycleno,
+                    unsigned int digits)
 {
   std::string suffixstr(digits+1,'.');
   suffix_no(suffixstr, cycleno);
   filename.append(suffixstr);
-    
+
   gmvwrite_openfile_ir_ascii((char*) filename.c_str(), 4, 8);
   gmvwrite_nodes_fromfile((char*) meshfile.c_str(), num_nodes);
   gmvwrite_cells_fromfile((char*) meshfile.c_str(), num_cells);
 }
 
 
-void open_data_file(const AmanziMesh::Mesh &mesh, std::string filename) 
+void open_data_file(const AmanziMesh::Mesh &mesh, std::string filename)
 {
   unsigned int num_nodes = mesh.num_entities(AmanziMesh::NODE, AmanziMesh::Parallel_type::OWNED);
   unsigned int num_cells = mesh.num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
@@ -146,37 +146,37 @@ void open_data_file(const AmanziMesh::Mesh &mesh, std::string filename)
 }
 
 
-void open_data_file(const AmanziMesh::Mesh &mesh, std::string filename, unsigned int cycleno, unsigned int digits) 
+void open_data_file(const AmanziMesh::Mesh &mesh, std::string filename, unsigned int cycleno, unsigned int digits)
 {
   unsigned int num_nodes = mesh.num_entities(AmanziMesh::NODE, AmanziMesh::Parallel_type::OWNED);
   unsigned int num_cells = mesh.num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
 
   std::string suffixstr(digits+1,'.');
   suffix_no(suffixstr, cycleno);
-  filename.append(suffixstr); 
+  filename.append(suffixstr);
   write_mesh_to_file_(mesh, filename);
 }
-  
 
-void write_time(const double time) 
+
+void write_time(const double time)
 {
   gmvwrite_probtime(time);
 }
 
 
-void write_cycle(const int cycle) 
+void write_cycle(const int cycle)
 {
   gmvwrite_cycleno(cycle);
 }
 
 
-void start_data() 
+void start_data()
 {
   gmvwrite_variable_header();
 }
-    
 
-void write_node_data(const Epetra_Vector &x, std::string varname) 
+
+void write_node_data(const Epetra_Vector &x, std::string varname)
 {
   double *node_data;
   int err = x.ExtractView(&node_data);
@@ -184,7 +184,7 @@ void write_node_data(const Epetra_Vector &x, std::string varname)
 }
 
 
-void write_node_data(const Epetra_MultiVector &x, const unsigned int component, std::string varname) 
+void write_node_data(const Epetra_MultiVector &x, const unsigned int component, std::string varname)
 {
   double **node_data;
   int err = x.ExtractView(&node_data);
@@ -194,7 +194,7 @@ void write_node_data(const Epetra_MultiVector &x, const unsigned int component, 
 }
 
 
-void write_cell_data(const Epetra_Vector &x, std::string varname) 
+void write_cell_data(const Epetra_Vector &x, std::string varname)
 {
   double *cell_data;
   int err = x.ExtractView(&cell_data);
@@ -202,7 +202,7 @@ void write_cell_data(const Epetra_Vector &x, std::string varname)
 }
 
 
-void write_cell_data(const Epetra_MultiVector &x, const unsigned int component, std::string varname) 
+void write_cell_data(const Epetra_MultiVector &x, const unsigned int component, std::string varname)
 {
   double **cell_data;
   int err = x.ExtractView(&cell_data);
@@ -212,15 +212,15 @@ void write_cell_data(const Epetra_MultiVector &x, const unsigned int component, 
 }
 
 
-void write_face_data(const Epetra_Vector &x, std::string varname) 
+void write_face_data(const Epetra_Vector &x, std::string varname)
 {
   double *face_data;
   int err = x.ExtractView(&face_data);
   gmvwrite_variable_name_data(2, (char*) varname.c_str(), face_data);
 }
 
-    
-void close_data_file() 
+
+void close_data_file()
 {
   gmvwrite_variable_endvars();
   gmvwrite_closefile();

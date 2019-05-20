@@ -28,7 +28,7 @@ Mesh::num_columns(bool ghosted) const
     Errors::Message mesg("num_columns called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return ghosted ? column_cells_->getNumEntriesInGlobalRow(0) : num_owned_cols_; // number of vector of vectors
+  return ghosted ? column_cells_->getGlobalNumEntries() : num_owned_cols_; // number of vector of vectors
 }
 
 
@@ -54,7 +54,11 @@ Mesh::faces_of_column(const int columnID, Entity_ID_List& rowinds) const
     Errors::Message mesg("faces_of_columns called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  rowinds = column_faces_[columnID];
+  size_t numEntriesInRow = column_faces_->getNumEntriesInGlobalRow(columnID);
+  Entity_ID_List rowvals(numEntriesInRow);
+  rowinds = Entity_ID_List(numEntriesInRow);
+  column_faces_->getGlobalRowCopy(columnID,rowinds(),rowvals(),
+    numEntriesInRow);
 }
 
 
@@ -66,7 +70,7 @@ Mesh::column_ID(const Entity_ID cellid) const
     Errors::Message mesg("column_ID called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return columnID_[cellid];
+  return columnID_->get1dView()[cellid];
 }
 
 
@@ -78,7 +82,7 @@ Mesh::cell_get_cell_above(const Entity_ID cellid) const
     Errors::Message mesg("cell_get_cell_above called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return cell_cellabove_.get1dView()[cellid];
+  return cell_cellabove_->get1dView()[cellid];
 }
 
 
@@ -90,7 +94,7 @@ Mesh::cell_get_cell_below(const Entity_ID cellid) const
     Errors::Message mesg("cell_get_cell_below called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return cell_cellbelow_.get1dView()[cellid];
+  return cell_cellbelow_->get1dView()[cellid];
 }
 
 
@@ -102,7 +106,7 @@ Mesh::node_get_node_above(const Entity_ID nodeid) const
     Errors::Message mesg("node_get_node_above called before calling build_columns");
     Exceptions::amanzi_throw(mesg);
   }
-  return node_nodeabove_[nodeid];
+  return node_nodeabove_->get1dView()[nodeid];
 }
 
 

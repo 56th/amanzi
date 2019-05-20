@@ -2,9 +2,9 @@
   WhetStone, Version 2.2
   Release name: naka-to.
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Konstantin Lipnikov (lipnikov@lanl.gov)
@@ -27,7 +27,7 @@ int DeRham_Face::L2consistency(
     int c, const Tensor& K, DenseMatrix& N, DenseMatrix& Mc, bool symmetry)
 {
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
   int nfaces = faces.size();
@@ -95,7 +95,7 @@ int DeRham_Face::L2consistencyInverse(
     int c, const Tensor& K, DenseMatrix& R, DenseMatrix& Wc, bool symmetry)
 {
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
   int nfaces = faces.size();
@@ -136,7 +136,7 @@ int DeRham_Face::L2consistencyInverse(
     for (int k = 0; k < d_; k++) R(i, k) = (fm[k] - cm[k]) * areas[i];
   }
 
-  /* Internal verification 
+  /* Internal verification
   DenseMatrix NtR(d, d);
   for (int i = 0; i < d; i++) {
     for (int j = 0; j < d; j++) {
@@ -161,7 +161,7 @@ int DeRham_Face::MassMatrixInverse(int c, const Tensor& K, DenseMatrix& W)
 
   int ok = L2consistencyInverse(c, K, R, W, true);
   if (ok) return ok;
- 
+
   StabilityScalar_(R, W);
 
   return ok;
@@ -169,5 +169,3 @@ int DeRham_Face::MassMatrixInverse(int c, const Tensor& K, DenseMatrix& W)
 
 }  // namespace WhetStone
 }  // namespace Amanzi
-
-

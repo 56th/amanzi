@@ -2,14 +2,14 @@
   WhetStone, Version 2.2
   Release name: naka-to.
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Konstantin Lipnikov (lipnikov@lanl.gov)
 
-  Maps between mesh objects located on different meshes, e.g. two states 
+  Maps between mesh objects located on different meshes, e.g. two states
   of a deformable mesh: virtual element implementation.
 */
 
@@ -46,7 +46,7 @@ void MeshMaps_VEM::VelocityCell(
       for (int n = 0; n < vf.size(); ++n) {
         vvf.push_back(vf[n][i]);
       }
-    
+
       if (projector_ == "H1") {
         mfd->H1Cell(c, vvf, NULL, vc[i]);
       }
@@ -67,7 +67,7 @@ void MeshMaps_VEM::VelocityFace(int f, VectorPolynomial& vf) const
     MeshMaps::VelocityFace(f, vf);
   } else {
     AmanziMesh::Entity_ID_List edges;
-    std::vector<int> dirs;
+    Teuchos::Array<int> dirs;
 
     mesh0_->face_get_edges_and_dirs(f, &edges, &dirs);
     int nedges = edges.size();
@@ -136,7 +136,7 @@ void MeshMaps_VEM::LeastSquareProjector_Cell_(
   AMANZI_ASSERT(order == 1 || order == 2);
 
   vc.Reshape(d_, d_, order);
-  
+
   AmanziGeometry::Point px1, px2;
   std::vector<AmanziGeometry::Point> x1, x2;
 
@@ -162,7 +162,7 @@ void MeshMaps_VEM::LeastSquareProjector_Cell_(
       x1.push_back(xf);
 
       for (int i = 0; i < d_; ++i)  {
-        px2[i] = vf[n][i].Value(xf); 
+        px2[i] = vf[n][i].Value(xf);
       }
       x2.push_back(px2);
     }
@@ -185,4 +185,3 @@ void MeshMaps_VEM::ParseInputParameters_(const Teuchos::ParameterList& plist)
 
 }  // namespace WhetStone
 }  // namespace Amanzi
-

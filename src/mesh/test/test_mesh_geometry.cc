@@ -4,10 +4,10 @@
  * @file   test_mesh_geometry.cc
  * @author Rao V. Garimella
  * @date   Tue May 15, 2012
- * 
- * @brief  
- * 
- * 
+ *
+ * @brief
+ *
+ *
  */
 // -------------------------------------------------------------
 // -------------------------------------------------------------
@@ -53,7 +53,7 @@ TEST(MESH_GEOMETRY_PLANAR)
     int aerr = 0;
     try {
       Amanzi::AmanziMesh::Preference prefs(meshfactory.preference());
-      prefs.clear(); 
+      prefs.clear();
       prefs.push_back(frameworks[i]);
       meshfactory.set_preference(prefs);
 
@@ -93,11 +93,14 @@ TEST(MESH_GEOMETRY_PLANAR)
 
     int space_dim_ = 2;
 
+    std::cout<<"Mesh created: "<<ncells<<" "<<nfaces<<" "<<nnodes<<std::endl;
+
     for (int i = 0; i < ncells; i++) {
 
+      std::cout<<"Cell: "<<i<<std::endl;
       Amanzi::AmanziGeometry::Point centroid = mesh->cell_centroid(i);
 
-      // Search for a cell with the same centroid in the 
+      // Search for a cell with the same centroid in the
       // expected list of centroid
 
       bool found = false;
@@ -113,21 +116,31 @@ TEST(MESH_GEOMETRY_PLANAR)
         }
       }
 
+      std::cout<<"check 1"<<std::endl;
+
       CHECK_EQUAL(found,true);
 
       Amanzi::AmanziMesh::Entity_ID_List cfaces;
-      Amanzi::AmanziGeometry::Point normal_sum(2), normal(2);      
+      Amanzi::AmanziGeometry::Point normal_sum(2), normal(2);
 
+      std::cout<<"check 1.1"<<std::endl;
       mesh->cell_get_faces(i,&cfaces);
+      std::cout<<"check 1.2"<<std::endl;
       normal_sum.set(0.0);
+
+      std::cout<<"check 2"<<std::endl;
 
       for (int j = 0; j < cfaces.size(); j++) {
         normal = mesh->face_normal(cfaces[j],false,i);
         normal_sum += normal;
       }
 
+      std::cout<<"check 3"<<std::endl;
+
       double val = L22(normal_sum);
-      CHECK_CLOSE(val,0.0,1.0e-20);                
+      CHECK_CLOSE(val,0.0,1.0e-20);
+
+      std::cout<<"check 4"<<std::endl;
     }
 
     for (int i = 0; i < nfaces; i++) {
@@ -146,16 +159,16 @@ TEST(MESH_GEOMETRY_PLANAR)
           // Check the natural normal
 
           Amanzi::AmanziGeometry::Point normal = mesh->face_normal(i);
-            
-      
+
+
           // Check the normal with respect to each connected cell
-          
+
           Amanzi::AmanziMesh::Entity_ID_List cellids;
           mesh->face_get_cells(i,Amanzi::AmanziMesh::Parallel_type::ALL,&cellids);
-          
+
           for (int k = 0; k < cellids.size(); k++) {
             int dir;
-            Amanzi::AmanziGeometry::Point normal_wrt_cell = 
+            Amanzi::AmanziGeometry::Point normal_wrt_cell =
               mesh->face_normal(i,false,cellids[k],&dir);
 
             //            Amanzi::AmanziMesh::Entity_ID_List cellfaces;
@@ -179,7 +192,7 @@ TEST(MESH_GEOMETRY_PLANAR)
 
             CHECK_ARRAY_EQUAL(&(normal1[0]),&(normal_wrt_cell[0]),space_dim_);
 
-            
+
             Amanzi::AmanziGeometry::Point cellcentroid = mesh->cell_centroid(cellids[k]);
             Amanzi::AmanziGeometry::Point facecentroid = mesh->face_centroid(i);
 
@@ -187,7 +200,7 @@ TEST(MESH_GEOMETRY_PLANAR)
 
 
             double dp = outvec*normal_wrt_cell;
-            dp /= (norm(outvec)*norm(normal_wrt_cell));         
+            dp /= (norm(outvec)*norm(normal_wrt_cell));
 
 
             CHECK_CLOSE(dp,1.0,1e-10);
@@ -239,7 +252,7 @@ TEST(MESH_GEOMETRY_SURFACE)
     int aerr = 0;
     try {
       Amanzi::AmanziMesh::Preference prefs(meshfactory.preference());
-      prefs.clear(); 
+      prefs.clear();
       prefs.push_back(frameworks[i]);
 
       meshfactory.set_preference(prefs);
@@ -284,7 +297,7 @@ TEST(MESH_GEOMETRY_SURFACE)
 
       Amanzi::AmanziGeometry::Point centroid = mesh->cell_centroid(i);
 
-      // Search for a cell with the same centroid in the 
+      // Search for a cell with the same centroid in the
       // expected list of centroid
 
       bool found = false;
@@ -318,18 +331,18 @@ TEST(MESH_GEOMETRY_SURFACE)
 
           CHECK_EQUAL(exp_face_area[j],mesh->face_area(i));
 
-      
+
           // Check the normal with respect to each connected cell
-          
+
           Amanzi::AmanziMesh::Entity_ID_List cellids;
           mesh->face_get_cells(i,Amanzi::AmanziMesh::Parallel_type::ALL,&cellids);
 
 
           Amanzi::AmanziGeometry::Point facecentroid = mesh->face_centroid(i);
-          
+
           for (int k = 0; k < cellids.size(); k++) {
             int dir;
-            Amanzi::AmanziGeometry::Point normal_wrt_cell = 
+            Amanzi::AmanziGeometry::Point normal_wrt_cell =
               mesh->face_normal(i,false,cellids[k],&dir);
 
             //            Amanzi::AmanziMesh::Entity_ID_List cellfaces;
@@ -354,19 +367,19 @@ TEST(MESH_GEOMETRY_SURFACE)
             Amanzi::AmanziGeometry::Point outvec = facecentroid-cellcentroid;
 
             double dp = outvec*normal_wrt_cell;
-            dp /= (norm(outvec)*norm(normal_wrt_cell));         
+            dp /= (norm(outvec)*norm(normal_wrt_cell));
 
             CHECK_CLOSE(dp,1.0,1e-10);
 
           }
 
 
-          if (cellids.size() == 2 && 
+          if (cellids.size() == 2 &&
               ((fabs(facecentroid[0]-0.5) < 1.0e-16) &&
                (fabs(facecentroid[2]) < 1.0e-16))) {
 
-            // An edge on the crease. The two normals should be different 
-   
+            // An edge on the crease. The two normals should be different
+
             Amanzi::AmanziGeometry::Point n0 = mesh->face_normal(i,false,cellids[0]);
             Amanzi::AmanziGeometry::Point n1 = mesh->face_normal(i,false,cellids[1]);
 
@@ -404,12 +417,12 @@ TEST(MESH_GEOMETRY_SOLID)
 
   frameworks.push_back(Amanzi::AmanziMesh::Framework::SIMPLE);
   framework_names.push_back("Simple");
-  
+
 #ifdef HAVE_MSTK_MESH
   frameworks.push_back(Amanzi::AmanziMesh::Framework::MSTK);
   framework_names.push_back("MSTK");
 #endif
-  
+
   for (int i = 0; i < frameworks.size(); i++) {
     // Set the framework
     std::cerr << "Testing geometry operators with " << framework_names[i] << std::endl;
@@ -422,7 +435,7 @@ TEST(MESH_GEOMETRY_SOLID)
     int aerr = 0;
     try {
       Amanzi::AmanziMesh::Preference prefs(meshfactory.preference());
-      prefs.clear(); 
+      prefs.clear();
       prefs.push_back(frameworks[i]);
 
       meshfactory.set_preference(prefs);
@@ -480,12 +493,12 @@ TEST(MESH_GEOMETRY_SOLID)
                                        {0.75,0.0,0.25},
                                        {0.25,0.0,0.75},
                                        {0.75,0.0,0.75},
-                                                 
+
                                        {0.25,0.5,0.25},
                                        {0.75,0.5,0.25},
                                        {0.25,0.5,0.75},
                                        {0.75,0.5,0.75},
-                                                 
+
                                        {0.25,1.0,0.25},
                                        {0.75,1.0,0.25},
                                        {0.25,1.0,0.75},
@@ -495,17 +508,17 @@ TEST(MESH_GEOMETRY_SOLID)
                                        {0.75,0.25,0.0},
                                        {0.25,0.75,0.0},
                                        {0.75,0.75,0.0},
-                                                     
+
                                        {0.25,0.25,0.5},
                                        {0.75,0.25,0.5},
                                        {0.25,0.75,0.5},
                                        {0.75,0.75,0.5},
-                                                     
+
                                        {0.25,0.25,1.0},
                                        {0.75,0.25,1.0},
                                        {0.25,0.75,1.0},
                                        {0.75,0.75,1.0},
-                                       
+
     };
 
 
@@ -519,7 +532,7 @@ TEST(MESH_GEOMETRY_SOLID)
 
       Amanzi::AmanziGeometry::Point centroid = mesh->cell_centroid(i);
 
-      // Search for a cell with the same centroid in the 
+      // Search for a cell with the same centroid in the
       // expected list of centroid
 
       bool found = false;
@@ -539,7 +552,7 @@ TEST(MESH_GEOMETRY_SOLID)
       CHECK_EQUAL(found,true);
 
       Amanzi::AmanziMesh::Entity_ID_List cfaces;
-      Amanzi::AmanziGeometry::Point normal_sum(3), normal(3);      
+      Amanzi::AmanziGeometry::Point normal_sum(3), normal(3);
 
       mesh->cell_get_faces(i,&cfaces);
       normal_sum.set(0.0);
@@ -550,7 +563,7 @@ TEST(MESH_GEOMETRY_SOLID)
       }
 
       double val = L22(normal_sum);
-      CHECK_CLOSE(val,0.0,1.0e-20);                
+      CHECK_CLOSE(val,0.0,1.0e-20);
     }
 
     for (int i = 0; i < nfaces; i++) {
@@ -570,16 +583,16 @@ TEST(MESH_GEOMETRY_SOLID)
           // Check the natural normal
 
           Amanzi::AmanziGeometry::Point normal = mesh->face_normal(i);
-            
-      
+
+
           // Check the normal with respect to each connected cell
-          
+
           Amanzi::AmanziMesh::Entity_ID_List cellids;
           mesh->face_get_cells(i,Amanzi::AmanziMesh::Parallel_type::ALL,&cellids);
-          
+
           for (int k = 0; k < cellids.size(); k++) {
             int dir;
-            Amanzi::AmanziGeometry::Point normal_wrt_cell = 
+            Amanzi::AmanziGeometry::Point normal_wrt_cell =
               mesh->face_normal(i,false,cellids[k],&dir);
 
             // Amanzi::AmanziMesh::Entity_ID_List cellfaces;
@@ -603,14 +616,14 @@ TEST(MESH_GEOMETRY_SOLID)
 
             CHECK_ARRAY_EQUAL(&(normal1[0]),&(normal_wrt_cell[0]),space_dim_);
 
-            
+
             Amanzi::AmanziGeometry::Point cellcentroid = mesh->cell_centroid(cellids[k]);
             Amanzi::AmanziGeometry::Point facecentroid = mesh->face_centroid(i);
 
             Amanzi::AmanziGeometry::Point outvec = facecentroid-cellcentroid;
 
             double dp = outvec*normal_wrt_cell;
-            dp /= (norm(outvec)*norm(normal_wrt_cell));         
+            dp /= (norm(outvec)*norm(normal_wrt_cell));
 
 
             CHECK_CLOSE(dp,1.0,1e-10);
@@ -623,7 +636,7 @@ TEST(MESH_GEOMETRY_SOLID)
       CHECK_EQUAL(found,true);
     }
 
-    
+
     // Now deform the mesh a little and verify that the sum of the
     // outward normals of all faces of cell is still zero
 
@@ -634,7 +647,7 @@ TEST(MESH_GEOMETRY_SOLID)
     CHECK_EQUAL(ccoords[0],0.5);
     CHECK_EQUAL(ccoords[1],0.5);
     CHECK_EQUAL(ccoords[2],0.5);
-    
+
     // Perturb it
     ccoords.set(0.7,0.7,0.7);
     mesh->node_set_coordinates(13,ccoords);
@@ -644,7 +657,7 @@ TEST(MESH_GEOMETRY_SOLID)
     for (int i = 0; i < ncells; i++) {
 
       Amanzi::AmanziMesh::Entity_ID_List cfaces;
-      Amanzi::AmanziGeometry::Point normal_sum(3), normal(3);      
+      Amanzi::AmanziGeometry::Point normal_sum(3), normal(3);
 
       mesh->cell_get_faces(i,&cfaces);
       normal_sum.set(0.0);
@@ -655,11 +668,10 @@ TEST(MESH_GEOMETRY_SOLID)
       }
 
       double val = L22(normal_sum);
-      CHECK_CLOSE(val,0.0,1.0e-20);                
+      CHECK_CLOSE(val,0.0,1.0e-20);
 
-    }    
+    }
 
   } // for each framework i
 
 }
-

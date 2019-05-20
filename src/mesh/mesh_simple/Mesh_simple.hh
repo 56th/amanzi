@@ -311,7 +311,7 @@ class Mesh_simple : public virtual Mesh {
 
   void cell_get_faces_and_dirs_internal_(const Entity_ID cellid,
                                          Entity_ID_List *faceids,
-                                         std::vector<int> *face_dirs,
+                                         Teuchos::Array<int> *face_dirs,
                                          const bool ordered=false) const;
 
   // Cells connected to a face
@@ -331,7 +331,7 @@ class Mesh_simple : public virtual Mesh {
   // Edges and directions of a 2D cell
   void cell_2D_get_edges_and_dirs_internal_(const Entity_ID cellid,
                                             Entity_ID_List *edgeids,
-                                            std::vector<int> *edgedirs) const
+                                            Teuchos::Array<int> *edgedirs) const
   {
     Errors::Message mesg("Edges not implemented in this framework. Use MSTK");
     Exceptions::amanzi_throw(mesg);
@@ -340,7 +340,7 @@ class Mesh_simple : public virtual Mesh {
   // Edges and edge directions of a face
   void face_get_edges_and_dirs_internal_(const Entity_ID cellid,
                                          Entity_ID_List *edgeids,
-                                         std::vector<int> *edgedirs,
+                                         Teuchos::Array<int> *edgedirs,
                                          bool ordered=true) const
   {
     Errors::Message mesg("Edges not implemented in this framework. Use MSTK");

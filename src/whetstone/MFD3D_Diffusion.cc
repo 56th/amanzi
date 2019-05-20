@@ -2,9 +2,9 @@
   WhetStone, Version 2.2
   Release name: naka-to.
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Konstantin Lipnikov (lipnikov@lanl.gov)
@@ -27,7 +27,7 @@ namespace Amanzi {
 namespace WhetStone {
 
 /* ******************************************************************
-* Consistency condition for inner product in space of fluxes. 
+* Consistency condition for inner product in space of fluxes.
 * Only upper triangular part of Mc = R (R^T N)^{-1} R^T is calculated.
 * Here R^T N = |c| K.
 * Fluxes include face areas!
@@ -36,7 +36,7 @@ int MFD3D_Diffusion::L2consistencyScaledArea(
     int c, const Tensor& K, DenseMatrix& N, DenseMatrix& Mc, bool symmetry)
 {
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
   int nfaces = faces.size();
@@ -79,7 +79,7 @@ int MFD3D_Diffusion::L2consistencyScaledArea(
 
 /* ******************************************************************
 * Consistency condition for inverse of the mass matrix in the space
-* of Darcy fluxes. Only the upper triangular part of matrix 
+* of Darcy fluxes. Only the upper triangular part of matrix
 * Wc = N (N^T R)^{-1} N^T is calculated. Here N^T R = |c| K.
 * Flux is scaled by face area!
 ****************************************************************** */
@@ -87,7 +87,7 @@ int MFD3D_Diffusion::L2consistencyInverseScaledArea(
     int c, const Tensor& K, DenseMatrix& R, DenseMatrix& Wc, bool symmetry)
 {
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
   int nfaces = faces.size();
@@ -130,7 +130,7 @@ int MFD3D_Diffusion::L2consistencyInverseScaledArea(
 
 
 /* ******************************************************************
-* Consistency condition for stiffness matrix in heat conduction. 
+* Consistency condition for stiffness matrix in heat conduction.
 * Only the upper triangular part of Ac is calculated.
 * The degrees of freedom are at nodes.
 ****************************************************************** */
@@ -138,7 +138,7 @@ int MFD3D_Diffusion::H1consistency(
     int c, const Tensor& K, DenseMatrix& N, DenseMatrix& Ac)
 {
   Entity_ID_List nodes, faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_nodes(c, &nodes);
   int nnodes = nodes.size();
@@ -170,7 +170,7 @@ int MFD3D_Diffusion::H1consistency(
       double u(0.5);
 
       if (d_ == 2) {
-        u = 0.5 * dirs[i]; 
+        u = 0.5 * dirs[i];
       } else {
         int jnext = (j + 1) % num_face_nodes;
         int jprev = (j + num_face_nodes - 1) % num_face_nodes;
@@ -194,7 +194,7 @@ int MFD3D_Diffusion::H1consistency(
   }
 
   // calculate upper part of R K R^T / volume
-  for (int i = 0; i < nnodes; i++) { 
+  for (int i = 0; i < nnodes; i++) {
     for (int k = 0; k < d_; k++) v1[k] = N(i, k);
     v2 = K * v1;
 
@@ -322,7 +322,7 @@ int MFD3D_Diffusion::StiffnessMatrixMMatrix(int c, const Tensor& K, DenseMatrix&
 
 
 /* *****************************************************************
-* Low-order L2 projector. 
+* Low-order L2 projector.
 * NOTE: we abuse the interface and return a linear polynomial.
 ***************************************************************** */
 void MFD3D_Diffusion::L2Cell(int c, const std::vector<Polynomial>& vf,
@@ -331,7 +331,7 @@ void MFD3D_Diffusion::L2Cell(int c, const std::vector<Polynomial>& vf,
   const AmanziGeometry::Point& cm = mesh_->cell_centroid(c);
 
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
   int num_faces = faces.size();
@@ -357,7 +357,7 @@ void MFD3D_Diffusion::L2Cell(int c, const std::vector<Polynomial>& vf,
 int MFD3D_Diffusion::DivergenceMatrix(int c, DenseMatrix& A)
 {
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
   int nfaces = faces.size();
@@ -365,8 +365,8 @@ int MFD3D_Diffusion::DivergenceMatrix(int c, DenseMatrix& A)
   A.Reshape(1, nfaces);
 
   for (int n = 0; n < nfaces; ++n) {
-    A(0, n) = mesh_->face_area(faces[n]) * dirs[n]; 
-  } 
+    A(0, n) = mesh_->face_area(faces[n]) * dirs[n];
+  }
   return WHETSTONE_ELEMENTAL_MATRIX_OK;
 }
 
@@ -376,7 +376,7 @@ int MFD3D_Diffusion::DivergenceMatrix(int c, DenseMatrix& A)
 ***************************************************************** */
 
 /* ******************************************************************
-* Consistency condition for inverse of mass matrix in space of 
+* Consistency condition for inverse of mass matrix in space of
 * fluxes. Only the upper triangular part of Wc is calculated.
 ****************************************************************** */
 int MFD3D_Diffusion::L2consistencyInverseDivKScaled(
@@ -384,7 +384,7 @@ int MFD3D_Diffusion::L2consistencyInverseDivKScaled(
     DenseMatrix& R, DenseMatrix& Wc)
 {
   Entity_ID_List faces, nodes;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
   int nfaces = faces.size();
@@ -421,7 +421,7 @@ int MFD3D_Diffusion::L2consistencyInverseDivKScaled(
 
   for (int i = 0; i < nfaces; i++) {
     int f = faces[i];
-    if (d_ == 2) { 
+    if (d_ == 2) {
       mesh_->face_get_nodes(f, &nodes);
 
       mesh_->node_get_coordinates(nodes[0], &v1);
@@ -456,7 +456,7 @@ int MFD3D_Diffusion::MassMatrixInverse(int c, const Tensor& K, DenseMatrix& W)
 
   int ok = L2consistencyInverse(c, K, R, W, true);
   if (ok) return ok;
- 
+
   StabilityScalar_(R, W);
   RescaleMassMatrixInverse_(c, W);
 
@@ -517,7 +517,7 @@ int MFD3D_Diffusion::MassMatrixInverseOptimized(
 
   int ok = L2consistencyInverse(c, K, R, W, true);
   if (ok) return ok;
- 
+
   ok = StabilityOptimized_(K, R, W);
   RescaleMassMatrixInverse_(c, W);
 
@@ -535,7 +535,7 @@ int MFD3D_Diffusion::MassMatrixInverseDivKScaled(
 
   int ok = L2consistencyInverseDivKScaled(c, K, kmean, kgrad, R, W);
   if (ok) return ok;
- 
+
   StabilityScalar_(R, W);
   RescaleMassMatrixInverse_(c, W);
 
@@ -568,7 +568,7 @@ void MFD3D_Diffusion::RescaleMassMatrixInverse_(int c, DenseMatrix& W)
 
 
 /* ******************************************************************
-* A simple monotone stability term for a 2D or 3D brick element. 
+* A simple monotone stability term for a 2D or 3D brick element.
 ****************************************************************** */
 int MFD3D_Diffusion::StabilityMMatrixHex_(int c, const Tensor& K, DenseMatrix& M)
 {
@@ -584,7 +584,7 @@ int MFD3D_Diffusion::StabilityMMatrixHex_(int c, const Tensor& K, DenseMatrix& M
   for (int i = 0; i < nrows; i++) map[i] = i;
 
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
 
   int i1, i2, k, l;
@@ -683,7 +683,7 @@ void MFD3D_Diffusion::StabilityScalarNonSymmetric_(int c, DenseMatrix& N, DenseM
   int ncols = N.NumCols();
 
   // add projector ss * (I - N^T N) to matrix M
-  for (int i = 0; i < nrows; i++) {  
+  for (int i = 0; i < nrows; i++) {
     M(i, i) += scalar_stability_;
 
     for (int j = i; j < nrows; j++) {
@@ -699,6 +699,3 @@ void MFD3D_Diffusion::StabilityScalarNonSymmetric_(int c, DenseMatrix& N, DenseM
 
 }  // namespace WhetStone
 }  // namespace Amanzi
-
-
-

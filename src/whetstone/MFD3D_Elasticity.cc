@@ -2,9 +2,9 @@
   WhetStone, Version 2.2
   Release name: naka-to.
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Konstantin Lipnikov (lipnikov@lanl.gov)
@@ -28,7 +28,7 @@ namespace Amanzi {
 namespace WhetStone {
 
 /* ******************************************************************
-* Consistency condition for mass matrix in mechanics. 
+* Consistency condition for mass matrix in mechanics.
 * Only the upper triangular part of Ac is calculated.
 * Requires mesh_get_edges to complete the implementation.
 ****************************************************************** */
@@ -66,14 +66,14 @@ int MFD3D_Elasticity::L2consistency(int c, const Tensor& T,
 
 
 /* ******************************************************************
-* Consistency condition for stiffness matrix in mechanics. 
+* Consistency condition for stiffness matrix in mechanics.
 * Only the upper triangular part of Ac is calculated.
 ****************************************************************** */
 int MFD3D_Elasticity::H1consistency(int c, const Tensor& T,
                                     DenseMatrix& N, DenseMatrix& Ac)
 {
   Entity_ID_List nodes, faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_nodes(c, &nodes);
   int nnodes = nodes.size();
@@ -125,7 +125,7 @@ int MFD3D_Elasticity::H1consistency(int c, const Tensor& T,
       double u(0.5);
 
       if (d_ == 2) {
-        u = 0.5 * dirs[i]; 
+        u = 0.5 * dirs[i];
       } else {
         int jnext = (j + 1) % num_face_nodes;
         int jprev = (j + num_face_nodes - 1) % num_face_nodes;
@@ -292,6 +292,3 @@ void MFD3D_Elasticity::MatrixMatrixProduct_(
 
 }  // namespace WhetStone
 }  // namespace Amanzi
-
-
-

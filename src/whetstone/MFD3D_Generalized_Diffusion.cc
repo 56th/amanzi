@@ -2,9 +2,9 @@
   WhetStone, Version 2.2
   Release name: naka-to.
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Konstantin Lipnikov (lipnikov@lanl.gov)
@@ -27,7 +27,7 @@ int MFD3D_Generalized_Diffusion::L2consistency(
     int c, const Tensor& K, DenseMatrix& N, DenseMatrix& Mc, bool symmetry)
 {
   Entity_ID_List faces, nodes;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
 
   int nfaces = faces.size();
@@ -47,7 +47,7 @@ int MFD3D_Generalized_Diffusion::L2consistency(
   for (int i = 0; i < nfaces; ++i) {
     int f = faces[i];
     const AmanziGeometry::Point& normal = mesh_->face_normal(f);
-    double area = mesh_->face_area(f);  
+    double area = mesh_->face_area(f);
     double area_div = norm(normal);
 
     CurvedFaceGeometry_(f, dirs[i], vv, xm);
@@ -100,14 +100,14 @@ int MFD3D_Generalized_Diffusion::MassMatrix(int c, const Tensor& K, DenseMatrix&
 
 
 /* ******************************************************************
-* Consistency condition for inverse of inner product on a generized 
+* Consistency condition for inverse of inner product on a generized
 * polyhedron.
 ****************************************************************** */
 int MFD3D_Generalized_Diffusion::L2consistencyInverse(
     int c, const Tensor& K, DenseMatrix& R, DenseMatrix& Wc, bool symmetry)
 {
   Entity_ID_List faces, nodes;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
 
   int nfaces = faces.size();
@@ -127,7 +127,7 @@ int MFD3D_Generalized_Diffusion::L2consistencyInverse(
   for (int i = 0; i < nfaces; ++i) {
     int f = faces[i];
     const AmanziGeometry::Point& normal = mesh_->face_normal(f);
-    double area = mesh_->face_area(f);  
+    double area = mesh_->face_area(f);
     double area_div = norm(normal);
 
     CurvedFaceGeometry_(f, dirs[i], vv, xm);
@@ -183,13 +183,13 @@ int MFD3D_Generalized_Diffusion::StiffnessMatrix(
   MassMatrixInverse(c, K, M);
 
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
 
   int nfaces = faces.size();
   int nx(d_ * nfaces);
 
-  // populate areas 
+  // populate areas
   DenseVector area(nx), area_div(nx);
   area_div.PutScalar(0.0);
 
@@ -198,12 +198,12 @@ int MFD3D_Generalized_Diffusion::StiffnessMatrix(
     const AmanziGeometry::Point& normal = mesh_->face_normal(f);
     area_div(d_ * i) = norm(normal);
 
-    double tmp = mesh_->face_area(f);  
+    double tmp = mesh_->face_area(f);
     area(d_ * i) = tmp;
     area(d_ * i + 1) = tmp * dirs[i];
     area(d_ * i + 2) = tmp * dirs[i];
   }
-    
+
   // populate stiffness matrix
   A.Reshape(nx + 1, nx + 1);
 
@@ -214,7 +214,7 @@ int MFD3D_Generalized_Diffusion::StiffnessMatrix(
     }
 
     double add(0.0);
-    for (int j = 0; j < nx; ++j) { 
+    for (int j = 0; j < nx; ++j) {
       add -= M(i, j) * area_div(j);
     }
     A(nx, i) = A(i, nx) = add * area(i);
@@ -233,7 +233,7 @@ int MFD3D_Generalized_Diffusion::StiffnessMatrix(
 int MFD3D_Generalized_Diffusion::DivergenceMatrix(int c, DenseMatrix& A)
 {
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
   int nfaces = faces.size();
@@ -244,8 +244,8 @@ int MFD3D_Generalized_Diffusion::DivergenceMatrix(int c, DenseMatrix& A)
   for (int n = 0; n < nfaces; ++n) {
     int f = faces[n];
     const AmanziGeometry::Point& normal = mesh_->face_normal(f);
-    A(0, d_ * n) = norm(normal) * dirs[n]; 
-  } 
+    A(0, d_ * n) = norm(normal) * dirs[n];
+  }
 
   return WHETSTONE_ELEMENTAL_MATRIX_OK;
 }
@@ -255,8 +255,8 @@ int MFD3D_Generalized_Diffusion::DivergenceMatrix(int c, DenseMatrix& A)
 * Geometry of a curved face
 ****************************************************************** */
 void MFD3D_Generalized_Diffusion::CurvedFaceGeometry_(
-    int f, int dirs, std::vector<AmanziGeometry::Point>& vv, 
-    std::vector<AmanziGeometry::Point>& xm) 
+    int f, int dirs, std::vector<AmanziGeometry::Point>& vv,
+    std::vector<AmanziGeometry::Point>& xm)
 {
   // local coordinate system uses external normal
   AmanziGeometry::Point normal(d_), xf(d_), v1(d_), v2(d_), v3(d_), p1(d_), p2(d_);
@@ -267,8 +267,8 @@ void MFD3D_Generalized_Diffusion::CurvedFaceGeometry_(
   if (fabs(normal[0]) > 0.1) {
     v1[0] = normal[1];
     v1[1] = -normal[0];
-    v1[2] = 0.0; 
-  } else { 
+    v1[2] = 0.0;
+  } else {
     v1[0] = 0.0;
     v1[1] = -normal[2];
     v1[2] = normal[1];
@@ -307,7 +307,7 @@ void MFD3D_Generalized_Diffusion::CurvedFaceGeometry_(
 
     v1 = xf - p1;
     v2 = xf - p2;
-    v3 = v1^v2; 
+    v3 = v1^v2;
     area += norm(v3) / 2;
 
     for (int k = 0; k < 3; ++k) {

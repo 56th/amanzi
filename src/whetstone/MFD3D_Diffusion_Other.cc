@@ -2,9 +2,9 @@
   WhetStone, Version 2.2
   Release name: naka-to.
 
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Author: Konstantin Lipnikov (lipnikov@lanl.gov)
@@ -31,7 +31,7 @@ namespace WhetStone {
 int MFD3D_Diffusion::MassMatrixInverseTPFA(int c, const Tensor& K, DenseMatrix& W)
 {
   Entity_ID_List faces;
-  std::vector<int> dirs;
+  Teuchos::Array<int> dirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &dirs);
   int nfaces = faces.size();
@@ -59,7 +59,7 @@ int MFD3D_Diffusion::MassMatrixInverseTPFA(int c, const Tensor& K, DenseMatrix& 
 
 
 /* ******************************************************************
-* The one-sided transmissibility coefficient. Any change to this 
+* The one-sided transmissibility coefficient. Any change to this
 * routine must be consistent with the above routine.
 ****************************************************************** */
 double MFD3D_Diffusion::Transmissibility(int f, int c, const Tensor& K)
@@ -111,7 +111,7 @@ int MFD3D_Diffusion::MassMatrixInverseDiagonal(int c, const Tensor& K, DenseMatr
 int MFD3D_Diffusion::MassMatrixInverseSO(int c, const Tensor& K, DenseMatrix& W)
 {
   Entity_ID_List faces;
-  std::vector<int> fdirs;
+  Teuchos::Array<int> fdirs;
 
   mesh_->cell_get_faces_and_dirs(c, &faces, &fdirs);
   int num_faces = faces.size();
@@ -183,7 +183,7 @@ int MFD3D_Diffusion::MassMatrixInverseSO(int c, const Tensor& K, DenseMatrix& W)
       }
     }
   }
- 
+
   // invert matrix W
   int ierr = W.Inverse();
   if (ierr != 0) {
@@ -197,6 +197,3 @@ int MFD3D_Diffusion::MassMatrixInverseSO(int c, const Tensor& K, DenseMatrix& W)
 
 }  // namespace WhetStone
 }  // namespace Amanzi
-
-
-

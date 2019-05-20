@@ -1,8 +1,8 @@
 /* -*-  mode: c++; c-default-style: "google"; indent-tabs-mode: nil -*- */
 /*
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Authors: Ethan Coon
@@ -43,7 +43,7 @@ class MeshSurfaceCell : public Mesh {
   MeshSurfaceCell(const Teuchos::RCP<const Mesh>& parent_mesh,
                   const std::string& setname,
                   bool flatten=true);
-  
+
   ~MeshSurfaceCell() = default;
 
   // Get parallel type of entity - OWNED, GHOST, ALL (See MeshDefs.hh)
@@ -221,7 +221,7 @@ class MeshSurfaceCell : public Mesh {
   virtual
   void node_set_coordinates(const Entity_ID nodeid,
                             const double *ncoord) {
-    
+
     Errors::Message mesg("Not implemented");
     Exceptions::amanzi_throw(mesg);
   }
@@ -293,7 +293,7 @@ class MeshSurfaceCell : public Mesh {
   unsigned int get_set_size(const std::string setname,
                             const Entity_kind kind,
                             const Parallel_type ptype) const;
-  
+
   // Get list of entities of type 'category' in set
   virtual
   void get_set_entities(const Set_ID setid,
@@ -322,7 +322,7 @@ class MeshSurfaceCell : public Mesh {
   virtual
   void cell_get_faces_and_dirs_internal_(const Entity_ID cellid,
           Entity_ID_List *faceids,
-          std::vector<int> *face_dirs,
+          Teuchos::Array<int> *face_dirs,
           const bool ordered=false) const;
 
   // Cells connected to a face - this function is implemented in each
@@ -337,7 +337,7 @@ class MeshSurfaceCell : public Mesh {
   virtual
   void face_get_edges_and_dirs_internal_(const Entity_ID faceid,
           Entity_ID_List *edgeids,
-          std::vector<int> *edge_dirs,
+          Teuchos::Array<int> *edge_dirs,
           const bool ordered=true) const;
 
   // edges of a cell - this function is implemented in each mesh
@@ -352,7 +352,7 @@ class MeshSurfaceCell : public Mesh {
   virtual
   void cell_2D_get_edges_and_dirs_internal_(const Entity_ID cellid,
           Entity_ID_List *edgeids,
-          std::vector<int> *edge_dirs) const;
+          Teuchos::Array<int> *edge_dirs) const;
 
  protected:
 

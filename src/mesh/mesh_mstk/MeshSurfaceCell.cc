@@ -43,7 +43,7 @@ MeshSurfaceCell::MeshSurfaceCell(const Teuchos::RCP<const Mesh>& parent_mesh,
   parent_mesh->get_set_entities(setname, AmanziMesh::Entity_kind::FACE, AmanziMesh::Parallel_type::OWNED, &my_cells);
   AMANZI_ASSERT(my_cells.size() == 1);
   parent_face_ = my_cells[0];
-  
+
   // set my nodes
   Entity_ID_List my_nodes;
   parent_mesh->face_get_nodes(parent_face_, &my_nodes);
@@ -77,7 +77,7 @@ MeshSurfaceCell::MeshSurfaceCell(const Teuchos::RCP<const Mesh>& parent_mesh,
 
     // set to false as default
     sets_[(*r)->id()] = false;
-      
+
     // determine if true
     if ((*r)->type() == AmanziGeometry::LABELEDSET
         || (*r)->type() == AmanziGeometry::ENUMERATED) {
@@ -96,7 +96,7 @@ MeshSurfaceCell::MeshSurfaceCell(const Teuchos::RCP<const Mesh>& parent_mesh,
       } else if ((*r)->space_dimension() == 2 && flatten) {
         sets_[(*r)->id()] = (*r)->inside(cell_centroid(0));
       }
-    }      
+    }
   }
 
   // set the cell type
@@ -117,7 +117,7 @@ MeshSurfaceCell::MeshSurfaceCell(const Teuchos::RCP<const Mesh>& parent_mesh,
 
 // Number of entities of any kind (cell, face, node) and in a
 // particular category (OWNED, GHOST, ALL)
-  
+
 unsigned int MeshSurfaceCell::num_entities(const Entity_kind kind,
         const Parallel_type ptype) const {
   int count;
@@ -336,7 +336,7 @@ void MeshSurfaceCell::write_to_exodus_file(const std::string filename) const {
 // cell_get_faces_and_dirs method of this class
 void MeshSurfaceCell::cell_get_faces_and_dirs_internal_(const Entity_ID cellid,
         Entity_ID_List *faceids,
-        std::vector<int> *face_dirs,
+        Teuchos::Array<int> *face_dirs,
         const bool ordered) const {
   AMANZI_ASSERT(cellid == 0);
   faceids->resize(nodes_.size());
@@ -358,7 +358,7 @@ void MeshSurfaceCell::face_get_cells_internal_(const Entity_ID faceid,
 // framework. The results are cached in the base class
 void MeshSurfaceCell::face_get_edges_and_dirs_internal_(const Entity_ID faceid,
         Entity_ID_List *edgeids,
-        std::vector<int> *edge_dirs,
+        Teuchos::Array<int> *edge_dirs,
         const bool ordered) const {
   Errors::Message mesg("Not implemented");
   Exceptions::amanzi_throw(mesg);
@@ -377,7 +377,7 @@ void MeshSurfaceCell::cell_get_edges_internal_(const Entity_ID cellid,
 // in each mesh framework. The results are cached in the base class.
 void MeshSurfaceCell::cell_2D_get_edges_and_dirs_internal_(const Entity_ID cellid,
         Entity_ID_List *edgeids,
-        std::vector<int> *edge_dirs) const {
+        Teuchos::Array<int> *edge_dirs) const {
   Errors::Message mesg("Not implemented");
   Exceptions::amanzi_throw(mesg);
 }
@@ -386,7 +386,3 @@ void MeshSurfaceCell::cell_2D_get_edges_and_dirs_internal_(const Entity_ID celli
 
 } // close namespace AmanziMesh
 } // close namespace Amanzi
-
-
-
-

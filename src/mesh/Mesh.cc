@@ -62,7 +62,6 @@ namespace AmanziMesh {
 // face->cell info and in the rare case that we don't, we are ready to
 // pay the storage price.
 //
-// Sets up: cell_face_ids_, cell_face_dirs_, face_cell_ids_, face_cell_ptype_
 
 Mesh::Mesh(const Comm_ptr_type& comm,
            const Teuchos::RCP<const AmanziGeometry::GeometricModel>& gm,
@@ -100,25 +99,36 @@ void
 Mesh::cache_cell_face_info_() const
 {
   int ncells = num_entities(CELL, Parallel_type::ALL);
-  cell_face_ids_.resize(ncells);
-  cell_face_dirs_.resize(ncells);
-
+  cell_face_ = Teuchos::rcp(new CrsMatrix_type<int>(map(CELL,false),map(FACE,false),0));
   int nfaces = num_entities(FACE, Parallel_type::ALL);
-  face_cell_ids_.resize(nfaces);
+  // Use tmp array to build the faces
+  Teuchos::Array<Teuchos::Array<Entity_ID>> face_cell_ids_tmp(nfaces);
+  Teuchos::Array<Teuchos::Array<int>> face_cell_dirs_tmp(nfaces);
+  face_cell_ids_ = Teuchos::rcp(new CrsMatrix_type<int>(map(FACE,false),map(CELL,false),0));
   face_cell_ptype_.resize(nfaces);
 
   for (int c = 0; c < ncells; c++) {
-    cell_get_faces_and_dirs_internal_(c, &(cell_face_ids_[c]),
-            &(cell_face_dirs_[c]), false);
+    Entity_ID_List cell_face_ids;
+    Teuchos::Array<int> cell_face_dirs;
+    cell_get_faces_and_dirs_internal_(c, &cell_face_ids,&cell_face_dirs, false);
+    cell_face_->insertGlobalValues(c,cell_face_ids,cell_face_dirs);
 
-    int nf = cell_face_ids_[c].size();
+    int nf = cell_face_ids.size();
     for (int jf = 0; jf < nf; jf++) {
-      Entity_ID f = cell_face_ids_[c][jf];
-      int dir = cell_face_dirs_[c][jf];
-      face_cell_ids_[f].push_back(dir > 0 ? c : ~c); // store 1s complement of c if dir is -ve
+      Entity_ID f = cell_face_ids[jf];
+      int dir = cell_face_dirs[jf];
+      face_cell_ids_tmp[f].push_back(c); // store 1s complement of c if dir is -ve
+      face_cell_dirs_tmp[f].push_back(dir > 0? c : ~c);
       face_cell_ptype_[f].push_back(entity_get_ptype(CELL, c));
     }
+    // Store in CRS matrix
   }
+  cell_face_->fillComplete();
+
+  for(int f = 0 ; f < nfaces; ++f){
+    face_cell_ids_->insertGlobalValues(f,face_cell_ids_tmp[f],face_cell_dirs_tmp[f]);
+  }
+  face_cell_ids_->fillComplete();
 
   cell2face_info_cached_ = true;
   face2cell_info_cached_ = true;
@@ -131,16 +141,15 @@ void
 Mesh::cache_face2edge_info_() const
 {
   int nfaces = num_entities(FACE,Parallel_type::ALL);
-  face_edge_ids_.resize(nfaces);
-  face_edge_dirs_.resize(nfaces);
+  face_edge_ = Teuchos::rcp(new CrsMatrix_type<int>(map(FACE,false),map(EDGE,false),0));
 
   for (int f = 0; f < nfaces; f++) {
     Entity_ID_List fedgeids;
-    std::vector<int> fedgedirs;
-
-    face_get_edges_and_dirs_internal_(f, &(face_edge_ids_[f]),
-            &(face_edge_dirs_[f]), true);
+    Teuchos::Array<int> fedgedirs;
+    face_get_edges_and_dirs_internal_(f, &fedgeids,&fedgedirs, true);
+    face_edge_->insertGlobalValues(f,fedgeids,fedgedirs);
   }
+  face_edge_->fillComplete();
 
   face2edge_info_cached_ = true;
   faces_requested_ = true;
@@ -153,18 +162,29 @@ void
 Mesh::cache_cell2edge_info_() const
 {
   int ncells = num_entities(CELL,Parallel_type::ALL);
-  cell_edge_ids_.resize(ncells);
+  cell_edge_ids_ = Teuchos::rcp(new CrsMatrix_type<int>(map(CELL,false),map(EDGE,false),0));
 
   if (space_dim_ == 2) {
-    cell_2D_edge_dirs_.resize(ncells);
-    for (int c = 0; c < ncells; c++)
-      cell_2D_get_edges_and_dirs_internal_(c, &(cell_edge_ids_[c]),
-              &(cell_2D_edge_dirs_[c]));
+    cell_2D_edge_dirs_ = Teuchos::rcp(new CrsMatrix_type<int>(map(CELL,false),map(EDGE,false),0));
+    for (int c = 0; c < ncells; c++){
+      Teuchos::Array<Entity_ID> cell_edge_ids_c;
+      Teuchos::Array<int> cell_2D_edge_dirs_c;
+      cell_2D_get_edges_and_dirs_internal_(c, &cell_edge_ids_c,
+              &cell_2D_edge_dirs_c);
+      cell_2D_edge_dirs_->insertGlobalValues(c,cell_edge_ids_c,cell_2D_edge_dirs_c);
+      cell_edge_ids_->insertGlobalValues(c,cell_edge_ids_c,cell_2D_edge_dirs_c);
+    }
+    cell_2D_edge_dirs_->fillComplete();
   }
   else
-    for (int c = 0; c < ncells; c++)
-      cell_get_edges_internal_(c, &(cell_edge_ids_[c]));
+    for (int c = 0; c < ncells; c++){
+      Teuchos::Array<Entity_ID> cell_edge_ids_c;
+      cell_get_edges_internal_(c, &cell_edge_ids_c);
+      Teuchos::Array<int> cellval(cell_edge_ids_c.size());
+      cell_edge_ids_->insertGlobalValues(c,cell_edge_ids_c,cellval);
+    }
 
+  cell_edge_ids_->fillComplete();
   cell2edge_info_cached_ = true;
 }
 
@@ -183,11 +203,11 @@ Mesh::cell_get_num_faces(const Entity_ID cellid) const
 {
 #if AMANZI_MESH_CACHE_VARS != 0
   if (!cell2face_info_cached_) cache_cell_face_info_();
-  return cell_face_ids_[cellid].size();
+  return cell_face_->getNumEntriesInGlobalRow(cellid);
 
 #else  // Non-cached version
   Entity_ID_List cfaceids;
-  std::vector<int> cfacedirs;
+  Teuchos::Array<int> cfacedirs;
 
   cell_get_faces_and_dirs_internal_(cellid, &cfaceids, &cfacedirs, false);
   return cfaceids.size();
@@ -243,21 +263,26 @@ Mesh::cell_get_max_edges() const
 void
 Mesh::cell_get_faces_and_dirs(const Entity_ID cellid,
                               Entity_ID_List *faceids,
-                              std::vector<int> *face_dirs,
+                              Teuchos::Array<int> *face_dirs,
                               const bool ordered) const
 {
 #if AMANZI_MESH_CACHE_VARS != 0
+
   if (!cell2face_info_cached_) cache_cell_face_info_();
 
-  if (ordered)
+  if (ordered){
     cell_get_faces_and_dirs_internal_(cellid, faceids, face_dirs, ordered);
-  else {
-    Entity_ID_List &cfaceids = cell_face_ids_[cellid];
-    *faceids = cfaceids; // copy operation
-
-    if (face_dirs) {
-      std::vector<int> &cfacedirs = cell_face_dirs_[cellid];
-      *face_dirs = cfacedirs; // copy operation
+  }else {
+    size_t numEntriesInRow = cell_face_->getNumEntriesInGlobalRow(cellid);
+    *faceids = Entity_ID_List(numEntriesInRow);
+    if(face_dirs){
+      *face_dirs =  Teuchos::Array<int>(numEntriesInRow);
+      cell_face_->getGlobalRowCopy(cellid,(*faceids)(),(*face_dirs)(),
+        numEntriesInRow);
+    }else{
+      Teuchos::Array<int> facedirs =  Teuchos::Array<int>(numEntriesInRow);
+      cell_face_->getGlobalRowCopy(cellid,(*faceids)(),facedirs(),
+        numEntriesInRow);
     }
   }
 
@@ -299,16 +324,22 @@ void Mesh::face_get_cells(const Entity_ID faceid, const Parallel_type ptype,
   cellids->clear();
   int n = face_cell_ptype_[faceid].size();
 
+  size_t numEntriesInRow = face_cell_ids_->getNumEntriesInGlobalRow(faceid);
+  Entity_ID_List rowvals(numEntriesInRow);
+  Entity_ID_List face_cell_ids_face = Entity_ID_List(numEntriesInRow);
+  face_cell_ids_->getGlobalRowCopy(faceid,face_cell_ids_face(),rowvals(),
+    numEntriesInRow);
+
   for (int i = 0; i < n; i++) {
     Parallel_type cell_ptype = face_cell_ptype_[faceid][i];
     if (cell_ptype == Parallel_type::PTYPE_UNKNOWN) continue;
 
-    int c = face_cell_ids_[faceid][i];
+    int c = rowvals[i];
     if (std::signbit(c)) c = ~c;  // strip dir info by taking 1s complement
 
     if (ptype == Parallel_type::ALL || ptype == cell_ptype)
       cellids->push_back(c);
-  } 
+  }
 
 #else  // Non-cached version
   Entity_ID_List fcells;
@@ -344,17 +375,20 @@ void Mesh::face_get_cells(const Entity_ID faceid, const Parallel_type ptype,
 void
 Mesh::face_get_edges_and_dirs(const Entity_ID faceid,
                               Entity_ID_List *edgeids,
-                              std::vector<int> *edge_dirs,
+                              Teuchos::Array<int> *edge_dirs,
                               const bool ordered) const
 {
 #if AMANZI_MESH_CACHE_VARS != 0
   if (!face2edge_info_cached_) cache_face2edge_info_();
 
-  *edgeids = face_edge_ids_[faceid]; // copy operation
-
-  if (edge_dirs) {
-    std::vector<int> &fedgedirs = face_edge_dirs_[faceid];
-    *edge_dirs = fedgedirs; // copy operation
+  size_t numEntriesInRow = face_edge_->getNumEntriesInGlobalRow(faceid);
+  *edgeids = Teuchos::Array<Entity_ID>(numEntriesInRow);
+  if(edge_dirs){
+    *edge_dirs = Teuchos::Array<int>(numEntriesInRow);
+    face_edge_->getGlobalRowCopy(faceid,(*edgeids)(),(*edge_dirs)(),numEntriesInRow);
+  }else{
+    Teuchos::Array<int> edgedirs = Teuchos::Array<int>(numEntriesInRow);
+    face_edge_->getGlobalRowCopy(faceid,(*edgeids)(),edgedirs(),numEntriesInRow);
   }
 
 #else  // Non-cached version
@@ -374,12 +408,22 @@ Mesh::face_to_cell_edge_map(const Entity_ID faceid,
   if (!face2edge_info_cached_) cache_face2edge_info_();
   if (!cell2edge_info_cached_) cache_cell2edge_info_();
 
-  map->resize(face_edge_ids_[faceid].size());
-  for (int f = 0; f < face_edge_ids_[faceid].size(); ++f) {
-    Entity_ID fedge = face_edge_ids_[faceid][f];
+  size_t numEntriesInRow_fe = face_edge_->getNumEntriesInGlobalRow(faceid);
+  Teuchos::Array<Entity_ID> edgeids = Teuchos::Array<Entity_ID>(numEntriesInRow_fe);
+  Teuchos::Array<int> edge_dirs = Teuchos::Array<int>(numEntriesInRow_fe);
+  face_edge_->getGlobalRowCopy(faceid,edgeids(),edge_dirs(),numEntriesInRow_fe);
 
-    for (int c = 0; c < cell_edge_ids_[cellid].size(); ++c) {
-      if (fedge == cell_edge_ids_[cellid][c]) {
+  size_t numEntriesInRow_ce = cell_edge_ids_->getNumEntriesInGlobalRow(cellid);
+  Teuchos::Array<Entity_ID> cellids = Teuchos::Array<Entity_ID>(numEntriesInRow_ce);
+  Teuchos::Array<int> celldirs = Teuchos::Array<int>(numEntriesInRow_ce);
+  cell_edge_ids_->getGlobalRowCopy(cellid,cellids(),celldirs(),numEntriesInRow_ce);
+
+  map->resize(numEntriesInRow_fe);
+  for (int f = 0; f < numEntriesInRow_fe; ++f) {
+    Entity_ID fedge = edgeids[f];
+
+    for (int c = 0; c < numEntriesInRow_ce; ++c) {
+      if (fedge == cellids[c]) {
         (*map)[f] = c;
         break;
       }
@@ -389,7 +433,7 @@ Mesh::face_to_cell_edge_map(const Entity_ID faceid,
 #else // non-cached version
 
   Entity_ID_List fedgeids, cedgeids;
-  std::vector<int> fedgedirs;
+  Teuchos::Array<int> fedgedirs;
 
   face_get_edges_and_dirs(faceid, &fedgeids, &fedgedirs, true);
   cell_get_edges(cellid, &cedgeids);
@@ -415,10 +459,13 @@ Mesh::cell_get_edges(const Entity_ID cellid,
                      Entity_ID_List *edgeids) const
 {
 #if AMANZI_MESH_CACHE_VARS != 0
+
   if (!cell2edge_info_cached_) cache_cell2edge_info_();
 
-  Entity_ID_List &cedgeids = cell_edge_ids_[cellid];
-  *edgeids = cell_edge_ids_[cellid]; // copy operation
+  size_t numEntriesInRow = cell_edge_ids_->getNumEntriesInGlobalRow(cellid);
+  *edgeids = Teuchos::Array<Entity_ID>(numEntriesInRow);
+  Teuchos::Array<int> celldirs = Teuchos::Array<int>(numEntriesInRow);
+  cell_edge_ids_->getGlobalRowCopy(cellid,(*edgeids)(),celldirs(),numEntriesInRow);
 
 #else  // Non-cached version
   cell_get_edges_internal_(cellid, edgeids);
@@ -430,13 +477,18 @@ Mesh::cell_get_edges(const Entity_ID cellid,
 void
 Mesh::cell_2D_get_edges_and_dirs(const Entity_ID cellid,
                                  Entity_ID_List *edgeids,
-                                 std::vector<int> *edgedirs) const
+                                 Teuchos::Array<int> *edgedirs) const
 {
 #if AMANZI_MESH_CACHE_VARS != 0
   if (!cell2edge_info_cached_) cache_cell2edge_info_();
 
-  *edgeids = cell_edge_ids_[cellid]; // copy operation
-  *edgedirs = cell_2D_edge_dirs_[cellid];
+  size_t numEntriesInRow = cell_edge_ids_->getNumEntriesInGlobalRow(cellid);
+  *edgeids = Teuchos::Array<Entity_ID>(numEntriesInRow);
+  *edgedirs = Teuchos::Array<int>(numEntriesInRow);
+  cell_edge_ids_->getGlobalRowCopy(cellid,(*edgeids)(),(*edgedirs)(),numEntriesInRow);
+
+  //*edgeids = cell_edge_ids_[cellid]; // copy operation
+  //*edgedirs = cell_2D_edge_dirs_[cellid];
 
 #else  // Non-cached version
   cell_2D_get_edges_and_dirs_internal_(cellid, edgeids, edgedirs);
@@ -544,7 +596,7 @@ Mesh::compute_cell_geometry_(const Entity_ID cellid, double *volume,
     // node ordering and computation for these special elements)
     Entity_ID_List faces;
     std::vector<unsigned int> nfnodes;
-    std::vector<int> fdirs;
+    Teuchos::Array<int> fdirs;
     std::vector<AmanziGeometry::Point> ccoords, cfcoords, fcoords;
 
     cell_get_faces_and_dirs(cellid,&faces,&fdirs);
@@ -639,7 +691,7 @@ Mesh::compute_face_geometry_(const Entity_ID faceid, double *area,
     *cellinds = cellids;
     for (int i = 0; i < cellids.size(); i++) {
       Entity_ID_List cellfaceids;
-      std::vector<int> cellfacedirs;
+      Teuchos::Array<int> cellfacedirs;
       int dir = 1;
 
       cell_get_faces_and_dirs(cellids[i], &cellfaceids, &cellfacedirs);
@@ -679,7 +731,7 @@ Mesh::compute_face_geometry_(const Entity_ID faceid, double *area,
       *cellinds = cellids;
       for (int i = 0; i < cellids.size(); i++) {
         Entity_ID_List cellfaceids;
-        std::vector<int> cellfacedirs;
+        Teuchos::Array<int> cellfacedirs;
         int dir = 1;
 
         cell_get_faces_and_dirs(cellids[i], &cellfaceids, &cellfacedirs);
@@ -721,7 +773,7 @@ Mesh::compute_face_geometry_(const Entity_ID faceid, double *area,
       *cellinds = cellids;
       for (int i = 0; i < cellids.size(); i++) {
         Entity_ID_List cellfaceids;
-        std::vector<int> cellfacedirs;
+        Teuchos::Array<int> cellfacedirs;
         int dir = 1;
 
         cell_get_faces_and_dirs(cellids[i], &cellfaceids, &cellfacedirs);
@@ -964,21 +1016,27 @@ Mesh::face_normal(const Entity_ID faceid,
 
   AMANZI_ASSERT(fnormals.size() > 0);
 
+  size_t numEntriesInRow = face_cell_ids_->getNumEntriesInGlobalRow(faceid);
+  Entity_ID_List rowvals(numEntriesInRow);
+  Entity_ID_List face_cell_ids_face = Entity_ID_List(numEntriesInRow);
+  face_cell_ids_->getGlobalRowCopy(faceid,face_cell_ids_face(),rowvals(),
+    numEntriesInRow);
+
   if (cellid == -1) {
     // Return the natural normal. This is the normal with respect to
     // the first cell, appropriately adjusted according to whether the
     // face is pointing into the cell (-ve cell id) or out
 
-    int c = face_cell_ids_[faceid][0];
+    int c = rowvals[0];
     return std::signbit(c) ? -fnormals[0] : fnormals[0];
   } else {
     // Find the index of 'cellid' in list of cells connected to face
 
     int dir;
     int irefcell;
-    int nfc = face_cell_ids_[faceid].size();
+    int nfc = rowvals.size();
     for (irefcell = 0; irefcell < nfc; irefcell++) {
-      int c = face_cell_ids_[faceid][irefcell];
+      int c = rowvals[irefcell];
       if (c == cellid || ~c == cellid) {
         dir = std::signbit(c) ? -1 : 1;
         break;
@@ -1141,7 +1199,7 @@ Mesh::valid_set_name(std::string name, Entity_kind kind) const
         return true;
     } else {
       if (kind == CELL && entity_type == "FACE") return true;
-    } 
+    }
     return false;
   }
 
@@ -1175,7 +1233,7 @@ Mesh::point_in_cell(const AmanziGeometry::Point &p, const Entity_ID cellid) cons
     int nf;
     Entity_ID_List faces;
     std::vector<unsigned int> nfnodes;
-    std::vector<int> fdirs;
+    Teuchos::Array<int> fdirs;
     std::vector<AmanziGeometry::Point> cfcoords;
 
     cell_get_faces_and_dirs(cellid,&faces,&fdirs);
@@ -1226,7 +1284,7 @@ Mesh::update_ghost_node_coordinates()
 
   // // change last arg to false after debugging
   // MultiVector_type owned_node_coords(node_map(true), ndim, true);
-  
+
 
   // AmanziGeometry::Point pnt(ndim);
 
@@ -1414,16 +1472,22 @@ Mesh::build_columns(const std::string& setname) const
   int nc = num_entities(CELL,Parallel_type::ALL);
   int nc_owned = num_entities(CELL,Parallel_type::OWNED);
 
-  columnID_.resize(nc);
-  cell_cellbelow_ = Vector_type<Entity_ID>(map(CELL,false));
-  cell_cellabove_ = Vector_type<Entity_ID>(map(CELL,false));
+  columnID_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
+  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map(CELL,false),0));
+  column_faces_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map(FACE,false),0));
+
+
+  cell_cellbelow_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
+  cell_cellabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
   for(int i = 0 ; i < nc; ++i){
-    cell_cellbelow_.replaceGlobalValue(i,-1);
-    cell_cellabove_.replaceGlobalValue(i,-1);
+    cell_cellbelow_->replaceGlobalValue(i,-1);
+    cell_cellabove_->replaceGlobalValue(i,-1);
   }
 
-  node_nodeabove_.resize(nn);
-  node_nodeabove_.assign(nn,-1);
+  node_nodeabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(NODE,false)));
+  for(int i = 0 ; i < nn; ++i){
+    node_nodeabove_->replaceGlobalValue(i,-1);
+  }
 
   Entity_ID_List top_faces;
   get_set_entities(setname, FACE, Parallel_type::ALL, &top_faces);
@@ -1457,6 +1521,7 @@ Mesh::build_columns(const std::string& setname) const
   }
   // End of matrix filling
   column_cells_->fillComplete();
+  column_faces_->fillComplete();
 
   int min_success;
   Teuchos::reduceAll(*get_comm(), Teuchos::REDUCE_MIN, 1, &success, &min_success);
@@ -1491,18 +1556,22 @@ Mesh::build_columns() const
 
   // Generate the structure
   column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map(CELL,false),0));
+  column_faces_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map(FACE,false),0));
 
-  columnID_.resize(nc);
 
-  cell_cellbelow_ = Vector_type<Entity_ID>(map(CELL,false));
-  cell_cellabove_ = Vector_type<Entity_ID>(map(CELL,false));
+  columnID_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
+
+  cell_cellbelow_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
+  cell_cellabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
   for(int i = 0 ; i < nc; ++i){
-    cell_cellbelow_.replaceGlobalValue(i,-1);
-    cell_cellabove_.replaceGlobalValue(i,-1);
+    cell_cellbelow_->replaceGlobalValue(i,-1);
+    cell_cellabove_->replaceGlobalValue(i,-1);
   }
 
-  node_nodeabove_.resize(nn);
-  node_nodeabove_.assign(nn,-1);
+  node_nodeabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(NODE,false)));;
+  for(int i = 0 ; i < nn ;++i){
+    node_nodeabove_->replaceGlobalValue(i,-1);
+  }
 
   // Find the faces at the top of the domain. We assume that these are all
   // the boundary faces whose normal points in the positive z-direction
@@ -1540,6 +1609,7 @@ Mesh::build_columns() const
   }
   // End of matrix filling
   column_cells_->fillComplete();
+  column_faces_->fillComplete();
 
   int min_success;
   Teuchos::reduceAll(*get_comm(), Teuchos::REDUCE_MIN, 1, &success, &min_success);
@@ -1559,7 +1629,7 @@ Mesh::build_single_column_(int colnum, Entity_ID top_face) const
   bool is_ghost_column = (entity_get_ptype(CELL, cur_cell) == Parallel_type::GHOST);
   Entity_ID bot_face = -1;
   Entity_ID_List fcells2, cfaces, colcells, colfaces;
-  std::vector<int> cfdirs;
+  Teuchos::Array<int> cfdirs;
 
   AmanziGeometry::Point negzvec(space_dim_);
   if (space_dim_ == 2)
@@ -1579,7 +1649,7 @@ Mesh::build_single_column_(int colnum, Entity_ID top_face) const
       break;
 
     }
-    columnID_[cur_cell] = colnum;
+    columnID_->get1dViewNonConst()[cur_cell] = colnum;
     colcells.push_back(cur_cell);
     colfaces.push_back(top_face);
 
@@ -1617,20 +1687,20 @@ Mesh::build_single_column_(int colnum, Entity_ID top_face) const
     // record the cell above and cell below
     face_get_cells(bot_face,Parallel_type::ALL,&fcells2);
     if (fcells2.size() == 2) {
-      if (cell_cellbelow_.get1dView()[cur_cell] != -1) {  // intersecting column of cells
+      if (cell_cellbelow_->get1dView()[cur_cell] != -1) {  // intersecting column of cells
         std::cerr << "Intersecting column of cells\n";
         success = 0;
         break;
       }
 
       if (fcells2[0] == cur_cell) {
-        cell_cellbelow_.get1dViewNonConst()[cur_cell] = fcells2[1];
-        cell_cellabove_.get1dViewNonConst()[fcells2[1]] = cur_cell;
+        cell_cellbelow_->get1dViewNonConst()[cur_cell] = fcells2[1];
+        cell_cellabove_->get1dViewNonConst()[fcells2[1]] = cur_cell;
         cur_cell = fcells2[1];
       }
       else if (fcells2[1] == cur_cell) {
-        cell_cellbelow_.get1dViewNonConst()[cur_cell] = fcells2[0];
-        cell_cellabove_.get1dViewNonConst()[fcells2[0]] = cur_cell;
+        cell_cellbelow_->get1dViewNonConst()[cur_cell] = fcells2[0];
+        cell_cellabove_->get1dViewNonConst()[fcells2[0]] = cur_cell;
         cur_cell = fcells2[0];
       }
       else {
@@ -1701,7 +1771,7 @@ Mesh::build_single_column_(int colnum, Entity_ID top_face) const
       int bot_i = (ind+even_odd*k)%nfvtop;
       if (bot_i < 0) bot_i += nfvtop;
       Entity_ID botnode = botnodes[bot_i];
-      node_nodeabove_[botnode] = topnode;
+      node_nodeabove_->get1dViewNonConst()[botnode] = topnode;
 
       // AMANZI_ASSERT used in debugging
       // AmanziGeometry::Point bc;
@@ -1723,7 +1793,8 @@ Mesh::build_single_column_(int colnum, Entity_ID top_face) const
     // Modify the matrix
     Teuchos::Array<Entity_ID> colvals(colcells.size());
     column_cells_->insertGlobalValues(colnum,colcells,colvals);
-    column_faces_.push_back(colfaces);
+    colvals = Teuchos::Array<Entity_ID>(colfaces.size());
+    column_faces_->insertGlobalValues(colnum,colfaces,colvals);
   }
 
   return success;

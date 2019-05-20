@@ -1,8 +1,8 @@
 /* -*-  mode: c++; c-default-style: "google"; indent-tabs-mode: nil -*- */
 /*
-  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL. 
-  Amanzi is released under the three-clause BSD License. 
-  The terms of use and "as is" disclaimer for this license are 
+  Copyright 2010-201x held jointly by LANS/LANL, LBNL, and PNNL.
+  Amanzi is released under the three-clause BSD License.
+  The terms of use and "as is" disclaimer for this license are
   provided in the top-level COPYRIGHT file.
 
   Authors: Rao Garimella, others
@@ -67,7 +67,7 @@ class MeshColumn : public Mesh {
   MeshColumn(const Teuchos::RCP<const Mesh>& parent_mesh,
              const int column_id,
              const Teuchos::RCP<const Teuchos::ParameterList>& plist=Teuchos::null);
-             
+
 
   ~MeshColumn() = default;
 
@@ -420,7 +420,7 @@ class MeshColumn : public Mesh {
   virtual
   void cell_get_faces_and_dirs_internal_(const Entity_ID cellid,
                                          Entity_ID_List *faceids,
-                                         std::vector<int> *face_dirs,
+                                         Teuchos::Array<int> *face_dirs,
                                          const bool ordered=false) const override {
 
     faceids->resize(2);
@@ -430,7 +430,7 @@ class MeshColumn : public Mesh {
     // odds with how it is in the parent mesh but within this mesh its
     // consistent - so we think everything will work as it should
     Entity_ID_List faceids_extracted;
-    std::vector<int> face_dirs_extracted;
+    Teuchos::Array<int> face_dirs_extracted;
     extracted_->cell_get_faces_and_dirs(cellid, &faceids_extracted,
             &face_dirs_extracted, ordered);
 
@@ -460,7 +460,7 @@ class MeshColumn : public Mesh {
   virtual
   void face_get_edges_and_dirs_internal_(const Entity_ID faceid,
                                          Entity_ID_List *edgeids,
-                                         std::vector<int> *edge_dirs,
+                                         Teuchos::Array<int> *edge_dirs,
                                          const bool ordered=true) const override {
     Errors::Message mesg("Not implemented");
     Exceptions::amanzi_throw(mesg);
@@ -481,7 +481,7 @@ class MeshColumn : public Mesh {
   virtual
   void cell_2D_get_edges_and_dirs_internal_(const Entity_ID cellid,
                                             Entity_ID_List *edgeids,
-                                            std::vector<int> *edge_dirs) const override {
+                                            Teuchos::Array<int> *edge_dirs) const override {
     Errors::Message mesg("Not implemented");
     Exceptions::amanzi_throw(mesg);
   }

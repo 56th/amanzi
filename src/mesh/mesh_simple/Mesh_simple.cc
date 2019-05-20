@@ -389,7 +389,7 @@ unsigned int Mesh_simple::num_entities(AmanziMesh::Entity_kind kind,
 
 void Mesh_simple::cell_get_faces_and_dirs_internal_(const AmanziMesh::Entity_ID cellid,
                                                     AmanziMesh::Entity_ID_List *faceids,
-                                                    std::vector<int> *cfacedirs,
+                                                    Teuchos::Array<int> *cfacedirs,
                                                     const bool ordered) const
 {
   unsigned int offset = (unsigned int) 6*cellid;

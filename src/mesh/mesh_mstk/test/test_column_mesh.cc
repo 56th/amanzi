@@ -101,7 +101,7 @@ TEST(COLUMN_MESH_3D)
 
   for (int j = 0; j < ncells; j++) {
     Amanzi::AmanziMesh::Entity_ID_List cfaces;
-    std::vector<int> cfdirs;
+    Teuchos::Array<int> cfdirs;
     colmesh.cell_get_faces_and_dirs(j,&cfaces,&cfdirs);
 
     CHECK_EQUAL(2,cfaces.size());
@@ -270,7 +270,7 @@ TEST(COLUMN_MESH_3D_FROM_SURFACE)
 
   for (int j = 0; j < ncells; j++) {
     Amanzi::AmanziMesh::Entity_ID_List cfaces;
-    std::vector<int> cfdirs;
+    Teuchos::Array<int> cfdirs;
     colmesh.cell_get_faces_and_dirs(j,&cfaces,&cfdirs);
 
     CHECK_EQUAL(2,cfaces.size());
