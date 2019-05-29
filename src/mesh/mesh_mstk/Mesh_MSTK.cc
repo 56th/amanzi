@@ -1467,7 +1467,6 @@ void Mesh_MSTK::cell_get_faces_and_dirs_internal_(const Entity_ID cellid,
 void Mesh_MSTK::cell_get_edges_internal_(const Entity_ID cellid,
                                          Entity_ID_List *edgeids) const
 {
-  std::cout<<"cell_get_edges_internal_"<<std::endl;
   AMANZI_ASSERT(edges_initialized);
 
   MEntity_ptr cell;

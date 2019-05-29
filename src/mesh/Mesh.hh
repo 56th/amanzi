@@ -869,14 +869,28 @@ protected:
   bool logical_;
   Teuchos::RCP<const Mesh> parent_;
 
+  Comm_ptr_type serialComm_ = Teuchos::rcp(new Teuchos::SerialComm<int>());
+
+  mutable Map_ptr_type map_cells;
+  mutable Map_ptr_type map_faces;
+  mutable Map_ptr_type map_edges;
+  mutable Map_ptr_type map_nodes;
   // the cache
   // -- geometry
   mutable Vector_ptr_type<double> cell_volumes_, face_areas_, edge_lengths_;
   mutable Vector_ptr_type<AmanziGeometry::Point> cell_centroids_, face_centroids_;
+
+  // -- Have to account for the fact that a "face" for a non-manifold
+  // surface mesh can have more than one cell connected to
+  // it. Therefore, we have to store as many normals for a face as
+  // there are cells connected to it. For a given face, its normal to
+  // face_get_cells()[i] is face_normals_[i]
+  mutable CrsMatrix_ptr_type<int> face_edge_;
+
   mutable Vector_ptr_type<AmanziGeometry::Point> edge_vectors_;
-  mutable Vector_ptr_type<Entity_ID> cell_cellabove_, cell_cellbelow_;
 
   // -- column information, only created if columns are requested
+  mutable Vector_ptr_type<Entity_ID> cell_cellabove_, cell_cellbelow_;
   mutable Vector_ptr_type<Entity_ID> node_nodeabove_;
   mutable Vector_ptr_type<Entity_ID> columnID_;
 
@@ -884,31 +898,17 @@ protected:
   mutable CrsMatrix_ptr_type<AmanziGeometry::Point> face_normals_;
 
   mutable CrsMatrix_ptr_type<Entity_ID> column_faces_;
-  mutable CrsMatrix_ptr_type<int> cell_face_;
-  mutable CrsMatrix_ptr_type<Entity_ID> face_cell_ids_;
-
-  mutable CrsMatrix_ptr_type<int> cell_edge_ids_;
-  mutable CrsMatrix_ptr_type<int> cell_2D_edge_dirs_;
-
-  mutable CrsMatrix_ptr_type<int> face_edge_;
-
-  // -- Have to account for the fact that a "face" for a non-manifold
-  // surface mesh can have more than one cell connected to
-  // it. Therefore, we have to store as many normals for a face as
-  // there are cells connected to it. For a given face, its normal to
-  // face_get_cells()[i] is face_normals_[i]
-  //mutable std::vector<Entity_ID_List> column_cells_;
-  //mutable std::vector<Entity_ID_List> column_faces_;
-  //mutable std::vector<Entity_ID_List> cell_face_ids_;
-  //mutable std::vector< std::vector<int> > cell_face_dirs_;  // 1 or -1
 
   // 1s complement if face is pointing out of cell; cannot use 0 as
   // cellid can be 0
-  //mutable std::vector<Entity_ID_List> face_cell_ids_;
+  mutable CrsMatrix_ptr_type<Entity_ID> face_cell_;
 
-  mutable std::vector< std::vector<Parallel_type> > face_cell_ptype_;
+  // -- topology
+  mutable CrsMatrix_ptr_type<int> cell_face_;
+  mutable CrsMatrix_ptr_type<int> cell_edge_;
 
-
+  // Parallel type is an int
+  mutable CrsMatrix_ptr_type<int> face_cell_ptype_;
 
   mutable int num_owned_cols_;
   mutable bool columns_built_;

@@ -99,13 +99,20 @@ void
 Mesh::cache_cell_face_info_() const
 {
   int ncells = num_entities(CELL, Parallel_type::ALL);
-  cell_face_ = Teuchos::rcp(new CrsMatrix_type<int>(map(CELL,false),map(FACE,false),0));
   int nfaces = num_entities(FACE, Parallel_type::ALL);
+
+  //const Teuchos::RCP<const Teuchos::Comm<0>> comm = Teuchos::rcp(new Teuchos::SerialComm<int>());
+  map_cells = Teuchos::rcp(new Map_type(ncells,0,serialComm_,Tpetra::LocallyReplicated));
+  map_faces = Teuchos::rcp(new Map_type(nfaces,0,serialComm_,Tpetra::LocallyReplicated));
+
+  cell_face_ = Teuchos::rcp(new CrsMatrix_type<int>(map_cells,map_faces,0));
   // Use tmp array to build the faces
-  Teuchos::Array<Teuchos::Array<Entity_ID>> face_cell_ids_tmp(nfaces);
-  Teuchos::Array<Teuchos::Array<int>> face_cell_dirs_tmp(nfaces);
-  face_cell_ids_ = Teuchos::rcp(new CrsMatrix_type<int>(map(FACE,false),map(CELL,false),0));
-  face_cell_ptype_.resize(nfaces);
+  Teuchos::Array<Teuchos::Array<Entity_ID>> face_cell_ids_(nfaces);
+  Teuchos::Array<Teuchos::Array<int>> face_cell_dirs_(nfaces);
+  Teuchos::Array<Teuchos::Array<int>> ptypes(nfaces);
+  face_cell_ = Teuchos::rcp(new CrsMatrix_type<int>(map_faces,map_cells,0));
+  face_cell_ptype_ = Teuchos::rcp(new CrsMatrix_type<int>(map_faces,map_cells,0));
+  //face_cell_ptype_.resize(nfaces);
 
   for (int c = 0; c < ncells; c++) {
     Entity_ID_List cell_face_ids;
@@ -117,18 +124,20 @@ Mesh::cache_cell_face_info_() const
     for (int jf = 0; jf < nf; jf++) {
       Entity_ID f = cell_face_ids[jf];
       int dir = cell_face_dirs[jf];
-      face_cell_ids_tmp[f].push_back(c); // store 1s complement of c if dir is -ve
-      face_cell_dirs_tmp[f].push_back(dir > 0? c : ~c);
-      face_cell_ptype_[f].push_back(entity_get_ptype(CELL, c));
+      face_cell_ids_[f].push_back(c); // store 1s complement of c if dir is -ve
+      face_cell_dirs_[f].push_back(dir > 0? c : ~c);
+      ptypes[f].push_back(static_cast<int>(entity_get_ptype(CELL, c)));
     }
     // Store in CRS matrix
   }
   cell_face_->fillComplete();
 
   for(int f = 0 ; f < nfaces; ++f){
-    face_cell_ids_->insertGlobalValues(f,face_cell_ids_tmp[f],face_cell_dirs_tmp[f]);
+    face_cell_->insertGlobalValues(f,face_cell_ids_[f],face_cell_dirs_[f]);
+    face_cell_ptype_->insertGlobalValues(f,face_cell_ids_[f],ptypes[f]);
   }
-  face_cell_ids_->fillComplete();
+  face_cell_->fillComplete();
+  face_cell_ptype_->fillComplete();
 
   cell2face_info_cached_ = true;
   face2cell_info_cached_ = true;
@@ -141,7 +150,13 @@ void
 Mesh::cache_face2edge_info_() const
 {
   int nfaces = num_entities(FACE,Parallel_type::ALL);
-  face_edge_ = Teuchos::rcp(new CrsMatrix_type<int>(map(FACE,false),map(EDGE,false),0));
+  int nedges = num_entities(EDGE,Parallel_type::ALL);
+
+
+  map_faces = Teuchos::rcp(new Map_type(nfaces,0,serialComm_,Tpetra::LocallyReplicated));
+  map_edges = Teuchos::rcp(new Map_type(nedges,0,serialComm_,Tpetra::LocallyReplicated));
+
+  face_edge_ = Teuchos::rcp(new CrsMatrix_type<int>(map_faces,map_edges,0));
 
   for (int f = 0; f < nfaces; f++) {
     Entity_ID_List fedgeids;
@@ -162,29 +177,34 @@ void
 Mesh::cache_cell2edge_info_() const
 {
   int ncells = num_entities(CELL,Parallel_type::ALL);
-  cell_edge_ids_ = Teuchos::rcp(new CrsMatrix_type<int>(map(CELL,false),map(EDGE,false),0));
+  int nedges = num_entities(EDGE,Parallel_type::ALL);
+
+
+  map_cells = Teuchos::rcp(new Map_type(ncells,0,serialComm_,Tpetra::LocallyReplicated));
+  map_edges = Teuchos::rcp(new Map_type(nedges,0,serialComm_,Tpetra::LocallyReplicated));
+
+  cell_edge_ = Teuchos::rcp(new CrsMatrix_type<int>(map_cells,map_edges,0));
 
   if (space_dim_ == 2) {
-    cell_2D_edge_dirs_ = Teuchos::rcp(new CrsMatrix_type<int>(map(CELL,false),map(EDGE,false),0));
     for (int c = 0; c < ncells; c++){
       Teuchos::Array<Entity_ID> cell_edge_ids_c;
-      Teuchos::Array<int> cell_2D_edge_dirs_c;
+      Teuchos::Array<int> cell_edge_dirs_c;
       cell_2D_get_edges_and_dirs_internal_(c, &cell_edge_ids_c,
-              &cell_2D_edge_dirs_c);
-      cell_2D_edge_dirs_->insertGlobalValues(c,cell_edge_ids_c,cell_2D_edge_dirs_c);
-      cell_edge_ids_->insertGlobalValues(c,cell_edge_ids_c,cell_2D_edge_dirs_c);
+              &cell_edge_dirs_c);
+      //cell_2D_edge_dirs_->insertGlobalValues(c,cell_edge_ids_c,cell_2D_edge_dirs_c);
+      cell_edge_->insertGlobalValues(c,cell_edge_ids_c,cell_edge_dirs_c);
     }
-    cell_2D_edge_dirs_->fillComplete();
+    //cell_2D_edge_dirs_->fillComplete();
   }
   else
     for (int c = 0; c < ncells; c++){
       Teuchos::Array<Entity_ID> cell_edge_ids_c;
       cell_get_edges_internal_(c, &cell_edge_ids_c);
       Teuchos::Array<int> cellval(cell_edge_ids_c.size());
-      cell_edge_ids_->insertGlobalValues(c,cell_edge_ids_c,cellval);
+      cell_edge_->insertGlobalValues(c,cell_edge_ids_c,cellval);
     }
 
-  cell_edge_ids_->fillComplete();
+  cell_edge_->fillComplete();
   cell2edge_info_cached_ = true;
 }
 
@@ -319,19 +339,21 @@ void Mesh::face_get_cells(const Entity_ID faceid, const Parallel_type ptype,
                           Entity_ID_List *cellids) const
 {
 #if AMANZI_MESH_CACHE_VARS != 0
-  if (!face2cell_info_cached_) cache_cell_face_info_();
+
+
+  if (!face2cell_info_cached_)  cache_cell_face_info_();
 
   cellids->clear();
-  int n = face_cell_ptype_[faceid].size();
-
-  size_t numEntriesInRow = face_cell_ids_->getNumEntriesInGlobalRow(faceid);
-  Entity_ID_List rowvals(numEntriesInRow);
-  Entity_ID_List face_cell_ids_face = Entity_ID_List(numEntriesInRow);
-  face_cell_ids_->getGlobalRowCopy(faceid,face_cell_ids_face(),rowvals(),
-    numEntriesInRow);
+  size_t n = face_cell_ptype_->getNumEntriesInGlobalRow(faceid);
+  //size_t numEntriesInRow = face_cell_->getNumEntriesInGlobalRow(faceid);
+  Entity_ID_List rowvals(n);
+  Entity_ID_List face_cell_ids_face = Entity_ID_List(n);
+  Teuchos::Array<int> aw_ptype = Teuchos::Array<int>(n);
+  face_cell_->getGlobalRowCopy(faceid,face_cell_ids_face(),rowvals(),n);
+  face_cell_ptype_->getGlobalRowCopy(faceid,face_cell_ids_face(),aw_ptype(),n);
 
   for (int i = 0; i < n; i++) {
-    Parallel_type cell_ptype = face_cell_ptype_[faceid][i];
+    Parallel_type cell_ptype = static_cast<Parallel_type>(aw_ptype[i]);
     if (cell_ptype == Parallel_type::PTYPE_UNKNOWN) continue;
 
     int c = rowvals[i];
@@ -342,6 +364,7 @@ void Mesh::face_get_cells(const Entity_ID faceid, const Parallel_type ptype,
   }
 
 #else  // Non-cached version
+
   Entity_ID_List fcells;
   face_get_cells_internal_(faceid, Parallel_type::ALL, &fcells);
 
@@ -413,10 +436,10 @@ Mesh::face_to_cell_edge_map(const Entity_ID faceid,
   Teuchos::Array<int> edge_dirs = Teuchos::Array<int>(numEntriesInRow_fe);
   face_edge_->getGlobalRowCopy(faceid,edgeids(),edge_dirs(),numEntriesInRow_fe);
 
-  size_t numEntriesInRow_ce = cell_edge_ids_->getNumEntriesInGlobalRow(cellid);
+  size_t numEntriesInRow_ce = cell_edge_->getNumEntriesInGlobalRow(cellid);
   Teuchos::Array<Entity_ID> cellids = Teuchos::Array<Entity_ID>(numEntriesInRow_ce);
   Teuchos::Array<int> celldirs = Teuchos::Array<int>(numEntriesInRow_ce);
-  cell_edge_ids_->getGlobalRowCopy(cellid,cellids(),celldirs(),numEntriesInRow_ce);
+  cell_edge_->getGlobalRowCopy(cellid,cellids(),celldirs(),numEntriesInRow_ce);
 
   map->resize(numEntriesInRow_fe);
   for (int f = 0; f < numEntriesInRow_fe; ++f) {
@@ -462,10 +485,10 @@ Mesh::cell_get_edges(const Entity_ID cellid,
 
   if (!cell2edge_info_cached_) cache_cell2edge_info_();
 
-  size_t numEntriesInRow = cell_edge_ids_->getNumEntriesInGlobalRow(cellid);
+  size_t numEntriesInRow = cell_edge_->getNumEntriesInGlobalRow(cellid);
   *edgeids = Teuchos::Array<Entity_ID>(numEntriesInRow);
   Teuchos::Array<int> celldirs = Teuchos::Array<int>(numEntriesInRow);
-  cell_edge_ids_->getGlobalRowCopy(cellid,(*edgeids)(),celldirs(),numEntriesInRow);
+  cell_edge_->getGlobalRowCopy(cellid,(*edgeids)(),celldirs(),numEntriesInRow);
 
 #else  // Non-cached version
   cell_get_edges_internal_(cellid, edgeids);
@@ -482,13 +505,11 @@ Mesh::cell_2D_get_edges_and_dirs(const Entity_ID cellid,
 #if AMANZI_MESH_CACHE_VARS != 0
   if (!cell2edge_info_cached_) cache_cell2edge_info_();
 
-  size_t numEntriesInRow = cell_edge_ids_->getNumEntriesInGlobalRow(cellid);
+  size_t numEntriesInRow = cell_edge_->getNumEntriesInGlobalRow(cellid);
   *edgeids = Teuchos::Array<Entity_ID>(numEntriesInRow);
   *edgedirs = Teuchos::Array<int>(numEntriesInRow);
-  cell_edge_ids_->getGlobalRowCopy(cellid,(*edgeids)(),(*edgedirs)(),numEntriesInRow);
+  cell_edge_->getGlobalRowCopy(cellid,(*edgeids)(),(*edgedirs)(),numEntriesInRow);
 
-  //*edgeids = cell_edge_ids_[cellid]; // copy operation
-  //*edgedirs = cell_2D_edge_dirs_[cellid];
 
 #else  // Non-cached version
   cell_2D_get_edges_and_dirs_internal_(cellid, edgeids, edgedirs);
@@ -502,8 +523,10 @@ Mesh::compute_cell_geometric_quantities_() const
 {
   int ncells = num_entities(CELL,Parallel_type::ALL);
 
-  cell_volumes_ = Teuchos::rcp(new Vector_type<double>(map(CELL,false)));
-  cell_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(map(CELL,false)));
+  map_cells = Teuchos::rcp(new Map_type(ncells,0,serialComm_,Tpetra::LocallyReplicated));
+
+  cell_volumes_ = Teuchos::rcp(new Vector_type<double>(map_cells));
+  cell_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(map_cells));
 
   for (int i = 0; i < ncells; i++) {
     double volume;
@@ -531,10 +554,11 @@ Mesh::compute_face_geometric_quantities_() const
   }
   int nfaces = num_entities(FACE,Parallel_type::ALL);
 
+  map_faces = Teuchos::rcp(new Map_type(nfaces,0,serialComm_,Tpetra::LocallyReplicated));
 
-  face_areas_ = Teuchos::rcp(new Vector_type<double>(map(FACE,false)));
-  face_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(map(FACE,false)));
-  face_normals_ = Teuchos::rcp(new CrsMatrix_type<AmanziGeometry::Point>(map(FACE,false),0));
+  face_areas_     = Teuchos::rcp(new Vector_type<double>(map_faces));
+  face_centroids_ = Teuchos::rcp( new Vector_type<AmanziGeometry::Point>(map_faces));
+  face_normals_   = Teuchos::rcp(new CrsMatrix_type<AmanziGeometry::Point>(map_faces,0));
 
   for (int i = 0; i < nfaces; i++) {
     double area;
@@ -550,7 +574,6 @@ Mesh::compute_face_geometric_quantities_() const
     face_centroids_->get1dViewNonConst()[i] = centroid;
     face_normals_->insertGlobalValues(i,cellinds,normals);
   }
-
   face_normals_->fillComplete();
   face_geometry_precomputed_ = true;
   return 1;
@@ -562,8 +585,10 @@ Mesh::compute_edge_geometric_quantities_() const
 {
   int nedges = num_entities(EDGE,Parallel_type::ALL);
 
-  edge_lengths_ = Teuchos::rcp(new Vector_type<double>(map(EDGE,false)));
-  edge_vectors_ = Teuchos::rcp(new Vector_type<Amanzi::AmanziGeometry::Point>(map(EDGE,false)));
+  map_edges = Teuchos::rcp(new Map_type(nedges,0,serialComm_,Tpetra::LocallyReplicated));
+
+  edge_lengths_ = Teuchos::rcp(new Vector_type<double>(map_edges));
+  edge_vectors_ = Teuchos::rcp(new Vector_type<Amanzi::AmanziGeometry::Point>(map_edges));
 
   for (int i = 0; i < nedges; i++) {
     double length;
@@ -1016,10 +1041,10 @@ Mesh::face_normal(const Entity_ID faceid,
 
   AMANZI_ASSERT(fnormals.size() > 0);
 
-  size_t numEntriesInRow = face_cell_ids_->getNumEntriesInGlobalRow(faceid);
+  size_t numEntriesInRow = face_cell_->getNumEntriesInGlobalRow(faceid);
   Entity_ID_List rowvals(numEntriesInRow);
   Entity_ID_List face_cell_ids_face = Entity_ID_List(numEntriesInRow);
-  face_cell_ids_->getGlobalRowCopy(faceid,face_cell_ids_face(),rowvals(),
+  face_cell_->getGlobalRowCopy(faceid,face_cell_ids_face(),rowvals(),
     numEntriesInRow);
 
   if (cellid == -1) {
@@ -1472,19 +1497,23 @@ Mesh::build_columns(const std::string& setname) const
   int nc = num_entities(CELL,Parallel_type::ALL);
   int nc_owned = num_entities(CELL,Parallel_type::OWNED);
 
-  columnID_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
-  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map(CELL,false),0));
-  column_faces_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map(FACE,false),0));
+  map_cells = Teuchos::rcp(new Map_type(nc,0,serialComm_,Tpetra::LocallyReplicated));
+  map_faces = Teuchos::rcp(new Map_type(nf_owned,0,serialComm_,Tpetra::LocallyReplicated));
+  map_nodes = Teuchos::rcp(new Map_type(nn,0,serialComm_,Tpetra::LocallyReplicated));
+
+  columnID_ = Teuchos::rcp(new Vector_type<Entity_ID>(map_cells));
+  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map_cells,0));
+  column_faces_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map_faces,0));
 
 
-  cell_cellbelow_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
-  cell_cellabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
+  cell_cellbelow_ = Teuchos::rcp(new Vector_type<Entity_ID>(map_cells));
+  cell_cellabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map_cells));
   for(int i = 0 ; i < nc; ++i){
     cell_cellbelow_->replaceGlobalValue(i,-1);
     cell_cellabove_->replaceGlobalValue(i,-1);
   }
 
-  node_nodeabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(NODE,false)));
+  node_nodeabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map_nodes));
   for(int i = 0 ; i < nn; ++i){
     node_nodeabove_->replaceGlobalValue(i,-1);
   }
@@ -1554,21 +1583,24 @@ Mesh::build_columns() const
   int nc = num_entities(CELL,Parallel_type::ALL);
   int nc_owned = num_entities(CELL, Parallel_type::OWNED);
 
+  map_cells = Teuchos::rcp(new Map_type(nc,0,serialComm_,Tpetra::LocallyReplicated));
+  map_faces = Teuchos::rcp(new Map_type(nf,0,serialComm_,Tpetra::LocallyReplicated));
+  map_nodes = Teuchos::rcp(new Map_type(nn,0,serialComm_,Tpetra::LocallyReplicated));
   // Generate the structure
-  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map(CELL,false),0));
-  column_faces_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map(FACE,false),0));
+  column_cells_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map_cells,0));
+  column_faces_ = Teuchos::rcp(new CrsMatrix_type<Entity_ID>(map_faces,0));
 
 
-  columnID_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
+  columnID_ = Teuchos::rcp(new Vector_type<Entity_ID>(map_cells));
 
-  cell_cellbelow_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
-  cell_cellabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(CELL,false)));
+  cell_cellbelow_ = Teuchos::rcp(new Vector_type<Entity_ID>(map_cells));
+  cell_cellabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map_cells));
   for(int i = 0 ; i < nc; ++i){
     cell_cellbelow_->replaceGlobalValue(i,-1);
     cell_cellabove_->replaceGlobalValue(i,-1);
   }
 
-  node_nodeabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map(NODE,false)));;
+  node_nodeabove_ = Teuchos::rcp(new Vector_type<Entity_ID>(map_nodes));;
   for(int i = 0 ; i < nn ;++i){
     node_nodeabove_->replaceGlobalValue(i,-1);
   }
