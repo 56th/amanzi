@@ -73,9 +73,21 @@ class DenseMatrix {
     return *this;
   }
 
+  DenseMatrix operator*(double val) const {
+    auto dummy = *this;
+    dummy *= val;
+    return dummy;
+  }
+
   DenseMatrix& operator/=(double val) {
     for (int i = 0; i < m_ * n_; i++) data_[i] /= val;
     return *this;
+  }
+
+  DenseMatrix operator/(double val) const {
+    auto dummy = *this;
+    dummy /= val;
+    return dummy;
   }
 
   DenseMatrix& operator+=(const DenseMatrix& A) {
@@ -83,15 +95,41 @@ class DenseMatrix {
     return *this;
   }
 
+  DenseMatrix operator+(DenseMatrix const & A) const {
+    auto dummy = *this;
+    dummy += A;
+    return dummy;
+  }
+
   DenseMatrix& operator-=(const DenseMatrix& A) {
     for (int i = 0; i < m_ * n_; i++) data_[i] -= A.data_[i];
     return *this;
+  }
+
+  DenseMatrix operator-(DenseMatrix const & A) const {
+    auto dummy = *this;
+    dummy -= A;
+    return dummy;
+  }
+
+  DenseMatrix operator-() const {
+    auto dummy = *this;
+    dummy *= -1.;
+    return dummy;
+  }
+
+  DenseMatrix& t() const {
+    const_cast<bool&>(t_) = !t_;
+    return const_cast<DenseMatrix&>(*this);
   }
 
   // calculates either A * B to A^T * B
   int Multiply(const DenseMatrix& A, const DenseMatrix& B, bool transposeA);
   // calculates B = *this * A
   int Multiply(const DenseVector& A, DenseVector& B, bool transpose) const;
+
+  DenseMatrix operator*(DenseMatrix const &) const;
+  DenseVector operator*(DenseVector const &) const;
 
   void PutScalar(double val) {
     for (int i = 0; i < m_ * n_; i++) data_[i] = val;
@@ -171,6 +209,7 @@ class DenseMatrix {
   void SwapColumns(int n1, int n2);
 
  private:
+  bool t_ = false;
   int m_, n_, mem_, access_;
   double* data_;                       
 };

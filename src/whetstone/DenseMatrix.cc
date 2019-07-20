@@ -238,6 +238,55 @@ int DenseMatrix::Multiply(const DenseVector& A, DenseVector& B, bool transpose) 
 
 
 /* ******************************************************************
+* return (*this) * B and transpose versions
+****************************************************************** */
+DenseMatrix DenseMatrix::operator*(DenseMatrix const & B) const {
+  auto aRows = NumRows();
+  auto aCols = NumCols();
+  if (t_) std::swap(aRows, aCols);
+  auto bRows = B.NumRows();
+  auto bCols = B.NumCols();
+  DenseMatrix C;
+  if (B.t_) {
+    std::swap(bRows, bCols);
+    C.Transpose(B);
+  }
+  else C = B;
+  DenseMatrix res(aRows, bCols);
+  res.PutScalar(0.);
+  auto status = res.Multiply(*this, C, t_);
+  if (status != 0) {
+    std::stringstream err;
+    err << "operator*: wrong mtx dim: A size is " << aRows << " * " << aCols << ", B size is " << bRows << " * " << bCols;
+    throw std::invalid_argument(err.str());
+  }
+  const_cast<bool&>(t_) = false;
+  const_cast<bool&>(B.t_) = false;
+  return res;
+}
+
+
+/* ******************************************************************
+* return (*this) * b or (*this)^T * b
+****************************************************************** */
+DenseVector DenseMatrix::operator*(DenseVector const & b) const {
+  auto aRows = NumRows();
+  auto aCols = NumCols();
+  if (t_) std::swap(aRows, aCols);
+  DenseVector res(aRows);
+  res.PutScalar(0.);
+  auto status = Multiply(b, res, t_);
+  if (status != 0) {
+    std::stringstream err;
+    err << "operator*: wrong mtx dim: A size is " << aRows << " * " << aCols << ", B size is " << b.NumRows();
+    throw std::invalid_argument(err.str());
+  }
+  const_cast<bool&>(t_) = false;
+  return res;
+}
+
+
+/* ******************************************************************
 * Second level routine: max values
 ****************************************************************** */
 void DenseMatrix::MaxRowValue(int irow, int jmin, int jmax, int* j, double* value)

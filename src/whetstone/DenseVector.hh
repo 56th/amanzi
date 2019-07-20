@@ -125,10 +125,20 @@ class DenseVector {
     return *this;
   }
 
+  DenseVector operator+(DenseVector const & b) {
+    auto dummy = *this;
+    return dummy += b;
+  }
+
   DenseVector& operator-=(const DenseVector& A) {
     const double* dataA = A.Values();  
     for (int i = 0; i < m_; ++i) data_[i] -= dataA[i];
     return *this;
+  }
+
+  DenseVector operator-(DenseVector const & b) {
+    auto dummy = *this;
+    return dummy -= b;
   }
 
   // compatibility members
