@@ -5,6 +5,9 @@
 #   Operator library
 #
 
+# stop after the first err
+add_definitions(-Wfatal-errors)
+
 # Amanzi module, include files found in AMANZI_MODULE_PATH
 include(PrintVariable)
 include(TestManager)
@@ -39,6 +42,9 @@ include_directories(${OUTPUT_SOURCE_DIR})
 include_directories(${SOLVERS_SOURCE_DIR})
 include_directories(${TIME_INTEGRATION_SOURCE_DIR})
 include_directories(${WHETSTONE_SOURCE_DIR})
+# https://github.com/56th/Singleton-Logger
+set(LOGGER_PATH /home/alexander/Documents/Singleton-Logger/sln/Sources/)
+include_directories(${LOGGER_PATH})
 
 
 
@@ -140,6 +146,9 @@ add_amanzi_library(operators
                           PDE_AdvectionUpwind.cc PDE_AdvectionRiemann.cc
                           PDE_CouplingFlux.cc
                           PDE_DiffusionMFD.cc PDE_DiffusionMFDwithGravity.cc
+                          PDE_DiffusionMFD_ASC.cc
+                          # https://github.com/56th/Singleton-Logger
+                          ${LOGGER_PATH}/SingletonLogger.cpp
                           PDE_DiffusionFV.cc PDE_DiffusionFVwithGravity.cc
                           PDE_DiffusionNLFV.cc PDE_DiffusionNLFVwithGravity.cc
                           PDE_DiffusionNLFVwithBndFaces.cc PDE_DiffusionNLFVwithBndFacesGravity.cc
@@ -166,9 +175,13 @@ if (BUILD_TESTS)
 
     # Copy test directory files if an out of source build
     if (NOT (${OPERATORS_SOURCE_DIR} EQUAL ${OPERATORS_BINARY_DIR}))
+        file(MAKE_DIRECTORY "${OPERATORS_BINARY_DIR}/test/meshes")
+        file(MAKE_DIRECTORY "${OPERATORS_BINARY_DIR}/test/io")
         file(GLOB DataFiles "${OPERATORS_SOURCE_DIR}/test/*.xml"
                             "${OPERATORS_SOURCE_DIR}/test/*.exo")
         file(COPY ${DataFiles} DESTINATION ${OPERATORS_BINARY_DIR}/test/)
+        file(GLOB DataMeshes "${OPERATORS_SOURCE_DIR}/test/meshes/*.exo")
+        file(COPY ${DataMeshes} DESTINATION ${OPERATORS_BINARY_DIR}/test/meshes/)
     endif()
 
     set(amanzi_libs geometry atk mesh mesh_factory mesh_logical data_structures operators whetstone output atk)
@@ -204,13 +217,14 @@ if (BUILD_TESTS)
 
     add_amanzi_test(operators_diffusion operators_diffusion
                     KIND unit
-                    SOURCE test/Main.cc test/operator_diffusion.cc
-                                        test/operator_diffusion_nodal.cc
-                                        test/operator_diffusion_divk.cc
-                                        test/operator_diffusion_nonsymmetric.cc
-                                        test/operator_diffusion_nlfv.cc
-                                        test/operator_diffusion_curved.cc
-                                        test/operator_diffusion_edges.cc test/MFD3D_Diffusion_Edge.cc
+                    SOURCE test/Main.cc #test/operator_diffusion.cc
+                                        #test/operator_diffusion_nodal.cc
+                                        #test/operator_diffusion_divk.cc
+                                        #test/operator_diffusion_nonsymmetric.cc
+                                        #test/operator_diffusion_nlfv.cc
+                                        #test/operator_diffusion_curved.cc
+                                        #test/operator_diffusion_edges.cc test/MFD3D_Diffusion_Edge.cc
+                                        test/operator_diffusion_asc.cc
                    LINK_LIBS ${amanzi_libs} ${UnitTest_LIBRARIES} ${HDF5_LIBRARIES})
 
 
@@ -362,5 +376,3 @@ if (BUILD_TESTS)
                     LINK_LIBS ${amanzi_libs} ${UnitTest_LIBRARIES})
 
 endif()
-
-

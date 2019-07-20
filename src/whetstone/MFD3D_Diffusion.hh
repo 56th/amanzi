@@ -61,6 +61,12 @@ class MFD3D_Diffusion : public MFD3D,
 
   // -- inverse mass matrix is modified to reflect scaling of fluxes by area
   virtual int MassMatrixInverse(int c, const Tensor& K, DenseMatrix& W) override; 
+  virtual int MassMatrixInverse(
+      const AmanziGeometry::Point& cm, double volume,
+      std::vector< AmanziGeometry::Point >& fm, 
+      std::vector< AmanziGeometry::Point >& fnor, 
+      std::vector< double >& face_area, const Tensor& K, DenseMatrix& W, bool rescale = false
+  );
 
   // -- stiffness matrix
   virtual int H1consistency(int c, const Tensor& K, DenseMatrix& N, DenseMatrix& Ac) override;

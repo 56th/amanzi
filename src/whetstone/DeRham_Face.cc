@@ -153,6 +153,37 @@ int DeRham_Face::L2consistencyInverse(
 
 
 /* ******************************************************************
+* Consistency condition for inverse of mass matrix.
+* Only the upper triangular part of Wc is calculated.
+****************************************************************** */
+int DeRham_Face::L2consistencyInverse(
+  const AmanziGeometry::Point& cm, double volume,
+  std::vector< AmanziGeometry::Point >& fm, 
+  std::vector< AmanziGeometry::Point >& fnor, // unit normals
+  std::vector< double >& face_area,
+  const Tensor& K, DenseMatrix& R, DenseMatrix& Wc, bool symmetry) {
+  int nfaces = fm.size();
+  if (fnor.size() != nfaces || face_area.size() != nfaces)
+    throw std::invalid_argument("__PRETTY_FUNCTION__: inconsistent faces vectors sizes");
+  R.Reshape(nfaces, d_);
+  Wc.Reshape(nfaces, nfaces);
+  // populate matrix W_0
+  AmanziGeometry::Point v1(d_);
+  for (int i = 0; i < nfaces; i++) {
+    v1 = K * fnor[i];
+    for (int j = i; j < nfaces; j++) {
+      const AmanziGeometry::Point& v2 = fnor[j];
+      Wc(i, j) = (v1 * v2) / (volume);
+    }
+  }
+  // populate matrix R
+  for (int i = 0; i < nfaces; i++) 
+    for (int k = 0; k < d_; k++) R(i, k) = (fm[i][k] - cm[k]) * face_area[i];
+  return WHETSTONE_ELEMENTAL_MATRIX_OK;
+}
+
+
+/* ******************************************************************
 * Inverse mass matrix: adding stability to the consistency
 ****************************************************************** */
 int DeRham_Face::MassMatrixInverse(int c, const Tensor& K, DenseMatrix& W)

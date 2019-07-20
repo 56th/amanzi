@@ -37,6 +37,13 @@ class DeRham_Face : virtual public InnerProductL2 {
   virtual int MassMatrix(int c, const Tensor& T, DenseMatrix& M); 
 
   virtual int L2consistencyInverse(int c, const Tensor& T, DenseMatrix& R, DenseMatrix& Wc, bool symmetry);
+  virtual int L2consistencyInverse(
+    const AmanziGeometry::Point& cm, double volume,
+    std::vector< AmanziGeometry::Point >& fm, 
+    std::vector< AmanziGeometry::Point >& fnor, 
+    std::vector< double >& face_area,
+    const Tensor& T, DenseMatrix& R, DenseMatrix& Wc, bool symmetry
+  );
   virtual int MassMatrixInverse(int c, const Tensor& T, DenseMatrix& W); 
 };
 
