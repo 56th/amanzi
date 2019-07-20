@@ -38,9 +38,6 @@ Tensor constTensor(double c) {
     return K;
 }
 
-/* *****************************************************************
-* This tests diffusion solvers with zero coefficients
-* **************************************************************** */
 TEST(OPERATOR_DIFFUSION_ASC) {
     using namespace Teuchos;
     using namespace Amanzi;
