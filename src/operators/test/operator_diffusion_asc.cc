@@ -45,6 +45,14 @@ Tensor constTensor(double c) {
     return K;
 }
 
+template<typename T>
+std::istream& operator>>(std::istream& inp, T& vec) {
+    for (size_t i = 0; i < 3; ++i) inp >> vec[i];
+    return inp;
+}
+template std::istream& operator>>(std::istream&, Tangram::Point3&);
+template std::istream& operator>>(std::istream&, Tangram::Vector3&);
+
 TEST(OPERATOR_DIFFUSION_ASC) {
     using namespace Teuchos;
     using namespace Amanzi;
@@ -66,10 +74,20 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             }
             auto meshIndex = logger.opt("choose mesh", meshNames);
             auto meshName = meshNames[meshIndex];
+            logger.beg("set t-junction interface");
+                Tangram::Point3 p1, p2;
+                Tangram::Vector3 n1, n2;
+                logger.inp("set p1", p1);
+                logger.inp("set p2", p2);
+                logger.inp("set n1", n1);
+                logger.inp("set n2", n2);
+            logger.end();
             auto solnIndex = logger.opt("choose soln", { "p = 1", "p = x + 2y + 3z + 4", "x" });
-            double k, c;
-            logger.inp("set diffusion coef", k);
-            logger.inp("set reaction coef", c);
+            logger.beg("set coefs");
+                double k, c;
+                logger.inp("set diffusion coef", k);
+                logger.inp("set reaction coef", c);
+            logger.end();
             auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
             logger.exp("stdin.txt");
         logger.end();
@@ -98,24 +116,28 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                     std::vector<int> cell_mat_ids;
                     std::vector<double> cell_mat_volfracs;
                     std::vector<Wonton::Point<3>> cell_mat_centroids;
-                    const std::vector<int> mesh_materials = {2, 0, 1};
-                    const std::vector< Tangram::Vector3 > material_interface_normals = {
-                        Wonton::Vector<3>(0.5, 0.5, 0.0), Wonton::Vector<3>(0.5, 0.025, -0.375)
-                    };
-                    const std::vector< Tangram::Point3 > material_interface_points = {
-                        Wonton::Point<3>(0.5, 0.5, 0.5), Wonton::Point<3>(0.5, 0.5, 0.5)
-                    };
-                    auto decompose_cells = true;
+                    const std::vector<int> mesh_materials = {0, 1, 2};
+                    const std::vector<Tangram::Vector3> material_interface_normals = { n1, n2 };
+                    const std::vector<Tangram::Point3> material_interface_points = { p1, p2 };
+                    auto decompose_cells = false; // assuming convex cells
                     int nmesh_materials = static_cast<int>(mesh_materials.size());
-                    std::vector< Tangram::Plane_t<3> > material_interfaces(nmesh_materials - 1);
+                    std::vector<Tangram::Plane_t<3>> material_interfaces(nmesh_materials - 1);
                     for (int iplane = 0; iplane < nmesh_materials - 1; iplane++) {
                         material_interfaces[iplane].normal = material_interface_normals[iplane];
                         material_interfaces[iplane].normal.normalize();
                         material_interfaces[iplane].dist2origin = -Wonton::dot(material_interface_points[iplane].asV(), material_interfaces[iplane].normal);
                     }
                     std::vector<std::vector<std::vector<r3d_poly>>> reference_mat_polys;
-                    get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, material_interfaces, mesh_materials, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, reference_mat_polys, decompose_cells);
-                    std::vector<int> offsets(numbOfCells, 0);
+                    try {
+                        get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, material_interfaces, mesh_materials, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, reference_mat_polys, decompose_cells);
+                    }
+                    catch (const std::bad_alloc& e) {
+                        std::stringstream err;
+                        err << "allocation failed in get_material_moments(): " << e.what();
+                        logger.err(err.str());
+                        exit(1);
+                    }
+                    std::vector<int> offsets(numbOfCells, 0.);
                     for (int icell = 0; icell < numbOfCells - 1; icell++)
                         offsets[icell + 1] = offsets[icell] + cell_num_mats[icell];
                 logger.end();
