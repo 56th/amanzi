@@ -81,6 +81,10 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 logger.inp("set p2", p2);
                 logger.inp("set n1", n1);
                 logger.inp("set n2", n2);
+                double noise;
+                logger.inp("set noise in [0, 1]", noise);
+                if (noise < 0.) noise = 0.;
+                if (noise > 1.) noise = 1.;
             logger.end();
             auto solnIndex = logger.opt("choose soln", { "p = 1", "p = x + 2y + 3z + 4", "x" });
             logger.beg("set coefs");
@@ -128,18 +132,20 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                         material_interfaces[iplane].dist2origin = -Wonton::dot(material_interface_points[iplane].asV(), material_interfaces[iplane].normal);
                     }
                     std::vector<std::vector<std::vector<r3d_poly>>> reference_mat_polys;
-                    try {
-                        get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, material_interfaces, mesh_materials, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, reference_mat_polys, decompose_cells);
-                    }
-                    catch (const std::bad_alloc& e) {
-                        std::stringstream err;
-                        err << "allocation failed in get_material_moments(): " << e.what();
-                        logger.err(err.str());
-                        exit(1);
-                    }
+                    get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, material_interfaces, mesh_materials, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, reference_mat_polys, decompose_cells);
                     std::vector<int> offsets(numbOfCells, 0.);
                     for (int icell = 0; icell < numbOfCells - 1; icell++)
                         offsets[icell + 1] = offsets[icell] + cell_num_mats[icell];
+                    // add noise
+                    for (int icell = 0; icell < numbOfCells; icell++) 
+                        if (cell_num_mats[icell] > 1) {
+                            auto i1 = offsets[icell];
+                            auto i2 = i1 + 1;
+                            if (cell_mat_volfracs[i1] < cell_mat_volfracs[i2]) std::swap(i1, i2);
+                            auto change = noise * cell_mat_volfracs[i1];
+                            cell_mat_volfracs[i1] -= change;
+                            cell_mat_volfracs[i2] += change;
+                        }
                 logger.end();
                 logger.beg("interface reconstruction");
                     // https://github.com/laristra/tangram/blob/master/doc/example.md
