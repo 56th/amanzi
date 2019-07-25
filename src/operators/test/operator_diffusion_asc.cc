@@ -51,16 +51,24 @@ TEST(OPERATOR_DIFFUSION_ASC) {
     try {
         auto comm = Amanzi::getDefaultComm();
         auto MyPID = comm->MyPID();
-        std::vector<std::string> meshNames;
-        {
-            using namespace boost::filesystem;
-            path p("test/meshes");
-            for (auto i = directory_iterator(p); i != directory_iterator(); ++i)
-                if (!is_directory(i->path()))
-                    meshNames.emplace_back(i->path().filename().string());
-        }
-        auto meshIndex = logger.opt("choose mesh", meshNames);
-        auto meshName = meshNames[meshIndex];
+        logger.beg("set input parameters");
+            std::vector<std::string> meshNames;
+            {
+                using namespace boost::filesystem;
+                path p("test/meshes");
+                for (auto i = directory_iterator(p); i != directory_iterator(); ++i)
+                    if (!is_directory(i->path()))
+                        meshNames.emplace_back(i->path().filename().string());
+            }
+            auto meshIndex = logger.opt("choose mesh", meshNames);
+            auto meshName = meshNames[meshIndex];
+            auto solnIndex = logger.opt("choose soln", { "p = 1", "p = x + 2y + 3z + 4", "x" });
+            double k, c;
+            logger.inp("set diffusion coef", k);
+            logger.inp("set reaction coef", c);
+            auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
+            logger.exp("stdin.txt");
+        logger.end();
         logger.beg("load mesh");
             std::string xmlFileName = "test/operator_diffusion_asc.xml";
             logger.log(xmlFileName);
@@ -86,7 +94,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.end();
         logger.beg("set exact soln");
             DiffusionReactionEqn eqn;
-            auto solnIndex = logger.opt("choose soln", { "p = 1", "p = x + 2y + 3z + 4", "x" });
+            eqn.c = c;
             if (solnIndex == 0) {
                 eqn.p = [](Node const &, double) { return 1.; };
                 eqn.pGrad = [](Node const &, double) { return Node(0., 0., 0.); };
@@ -104,11 +112,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 auto const pHess = constTensor(0.);
                 eqn.pHess = [=](Node const &, double) { return pHess; };
             }
-            double k;
-            logger.inp("set diffusion coef", k);
             auto const K = constTensor(k);
             eqn.K = [=](Node const &, double) { return K; };
-            logger.inp("set reaction coef", eqn.c);
             PDE_DiffusionMFD_ASC::BC bc;
             bc.type = PDE_DiffusionMFD_ASC::BCType::Dirichlet;
             bc.p = [=](Node const & x) { return true; };
@@ -133,7 +138,6 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             op.computeExactConcentrations(pFaceExact, eqn.p, 0.); 
             op.computeExactCellVals(pCellExact, eqn.p, 0.); 
         logger.end();
-        auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
         if (solveIndex == 0) {
             logger.beg("assemble global system");
                 auto opGlobal = op.global_operator();
@@ -233,7 +237,6 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             io.WriteVector(*pCellExact(0), "p_*", AmanziMesh::CELL);
             io.FinalizeCycle();
         logger.end();
-        logger.exp("stdin.txt");
     } catch (std::exception const & e) {
         logger.err(e.what());
     }
