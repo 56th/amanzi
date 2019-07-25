@@ -43,8 +43,8 @@ include_directories(${SOLVERS_SOURCE_DIR})
 include_directories(${TIME_INTEGRATION_SOURCE_DIR})
 include_directories(${WHETSTONE_SOURCE_DIR})
 # https://github.com/56th/Singleton-Logger
-set(LOGGER_PATH /home/alexander/Documents/Singleton-Logger/sln/Sources/)
-include_directories(${LOGGER_PATH})
+set(LOGGER_PATH /home/alexander/Documents/Singleton-Logger/)
+include_directories(${LOGGER_PATH}/sln/Sources/)
 # tangram
 set(TANGRAM_PATH /home/alexander/Documents/Amanzi/tangram/)
 include_directories(${TANGRAM_PATH})
@@ -152,7 +152,7 @@ add_amanzi_library(operators
                           ###
                           PDE_DiffusionMFD_ASC.cc
                           # https://github.com/56th/Singleton-Logger
-                          ${LOGGER_PATH}/SingletonLogger.cpp
+                          ${LOGGER_PATH}/sln/Sources/SingletonLogger.cpp
                           # tangram
                           ${TANGRAM_PATH}/tangram/intersect/r2d.c
                           ${TANGRAM_PATH}/tangram/intersect/r3d.c
