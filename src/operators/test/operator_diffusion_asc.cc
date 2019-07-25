@@ -28,8 +28,12 @@
 // fancy colors for cout logging 
 #include "SingletonLogger.hpp"
 
-// mesh wrapper to work with tangram
+// tangram (for MOF/XMOF interface reconstruction)
 #include "wonton/wonton/mesh/amanzi/amanzi_mesh_wrapper.h"
+#include "tangram/driver/driver.h"
+#include "tangram/driver/write_to_gmv.h"
+#include "tangram/reconstruct/MOF.h"
+#include "tangram/utility/get_material_moments.h"
 
 #include "PDE_DiffusionMFD_ASC.hh"
 #include "DiffusionReactionEqn.hh"
@@ -75,21 +79,72 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             ParameterXMLFileReader xmlreader(xmlFileName);
             auto plist = xmlreader.getParameters();
             plist.get<Teuchos::ParameterList>("io").set<std::string>("file name base", plist.get<Teuchos::ParameterList>("io").get<std::string>("file name base") + '/' +  meshName);
+            auto ioNameBase = plist.get<Teuchos::ParameterList>("io").get<std::string>("file name base", "amanzi_vis");
             auto region_list = plist.get<Teuchos::ParameterList>("regions");
             Teuchos::RCP<GeometricModel> gm = Teuchos::rcp(new GeometricModel(3, region_list, *comm));
             MeshFactory meshfactory(comm, gm);
             meshfactory.set_preference(Preference({Framework::MSTK, Framework::STK}));
             Teuchos::RCP<const Mesh> mesh = meshfactory.create("test/meshes/" + meshName);
-            auto numbOfCells = mesh->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::ALL);
-            auto numbOfFaces = mesh->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::ALL);
+            auto numbOfCells = mesh->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
+            auto numbOfFaces = mesh->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::OWNED);
             logger.buf << "numb of cells: " << numbOfCells << '\n'
                        << "numb of faces: " << numbOfFaces;
             logger.log();
-            logger.beg("tangram");
+            logger.beg("tangram XMOF interface reconstruction");
                 Wonton::Amanzi_Mesh_Wrapper meshWrapper(*mesh);
-                logger.buf << "numb of cells: " << meshWrapper.num_owned_cells() << '\n'
-                           << "numb of faces: " << meshWrapper.num_owned_faces();
-                logger.log();
+                logger.beg("generate input data");
+                    // https://github.com/laristra/portage/blob/master/app/portageapp/portageapp_t-junction_jali.cc
+                    std::vector<int> cell_num_mats;
+                    std::vector<int> cell_mat_ids;
+                    std::vector<double> cell_mat_volfracs;
+                    std::vector<Wonton::Point<3>> cell_mat_centroids;
+                    const std::vector<int> mesh_materials = {2, 0, 1};
+                    const std::vector< Tangram::Vector3 > material_interface_normals = {
+                        Wonton::Vector<3>(0.5, 0.5, 0.0), Wonton::Vector<3>(0.5, 0.025, -0.375)
+                    };
+                    const std::vector< Tangram::Point3 > material_interface_points = {
+                        Wonton::Point<3>(0.5, 0.5, 0.5), Wonton::Point<3>(0.5, 0.5, 0.5)
+                    };
+                    auto decompose_cells = true;
+                    int nmesh_materials = static_cast<int>(mesh_materials.size());
+                    std::vector< Tangram::Plane_t<3> > material_interfaces(nmesh_materials - 1);
+                    for (int iplane = 0; iplane < nmesh_materials - 1; iplane++) {
+                        material_interfaces[iplane].normal = material_interface_normals[iplane];
+                        material_interfaces[iplane].normal.normalize();
+                        material_interfaces[iplane].dist2origin = -Wonton::dot(material_interface_points[iplane].asV(), material_interfaces[iplane].normal);
+                    }
+                    std::vector<std::vector<std::vector<r3d_poly>>> reference_mat_polys;
+                    get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, material_interfaces, mesh_materials, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, reference_mat_polys, decompose_cells);
+                    std::vector<int> offsets(numbOfCells, 0);
+                    for (int icell = 0; icell < numbOfCells - 1; icell++)
+                        offsets[icell + 1] = offsets[icell] + cell_num_mats[icell];
+                logger.end();
+                logger.beg("interface reconstruction");
+                    // https://github.com/laristra/tangram/blob/master/doc/example.md
+                    std::vector<Tangram::IterativeMethodTolerances_t> ims_tols(2);
+                    ims_tols[0] = {.max_num_iter = 1000, .arg_eps = 1.0e-15, .fun_eps = 1.0e-14};
+                    ims_tols[1] = {.max_num_iter = 100, .arg_eps = 1.0e-12, .fun_eps = 1.0e-14};
+                    auto all_cells_are_convex = true;
+                    Tangram::Driver<Tangram::MOF, 3, Wonton::Amanzi_Mesh_Wrapper, Tangram::SplitR3D, Tangram::ClipR3D> mof_driver(meshWrapper, ims_tols, all_cells_are_convex);
+                    mof_driver.set_volume_fractions(cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids);
+                    mof_driver.reconstruct();
+                    auto cellmatpoly_list = mof_driver.cell_matpoly_ptrs();
+                logger.end();
+                logger.beg("export to .gmv");
+                    // https://github.com/laristra/tangram/blob/master/app/test_mof/test_mof_3d.cc
+                    // create MatPoly's for single-material cells
+                    for (int icell = 0; icell < numbOfCells; icell++) 
+                        if (cell_num_mats[icell] == 1) {
+                            assert(cellmatpoly_list[icell] == nullptr);
+                            std::shared_ptr<Tangram::CellMatPoly<3>> cmp_ptr(new Tangram::CellMatPoly<3>(icell));
+                            Tangram::MatPoly<3> cell_matpoly;
+                            cell_get_matpoly(meshWrapper, icell, &cell_matpoly);
+                            cell_matpoly.set_mat_id(cell_mat_ids[offsets[icell]]);
+                            cmp_ptr->add_matpoly(cell_matpoly);
+                            cellmatpoly_list[icell] = cmp_ptr;
+                        }
+                    write_to_gmv(cellmatpoly_list, ioNameBase + "_mof.gmv");
+                logger.end();
             logger.end();
         logger.end();
         logger.beg("set exact soln");
@@ -228,7 +283,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                        << "p_* mean:    " << pCellExactMean << '\n';
             logger.log();
         logger.end();
-        logger.beg("export vtk");
+        logger.beg("export to .hdf5");
             Amanzi::OutputXDMF io(plist.get<Teuchos::ParameterList>("io"), mesh, true, false);
             io.InitializeCycle(0., 0);
             io.WriteVector(*pCell(0), "p_h", AmanziMesh::CELL);

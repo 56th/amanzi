@@ -149,9 +149,14 @@ add_amanzi_library(operators
                           PDE_AdvectionUpwind.cc PDE_AdvectionRiemann.cc
                           PDE_CouplingFlux.cc
                           PDE_DiffusionMFD.cc PDE_DiffusionMFDwithGravity.cc
+                          ###
                           PDE_DiffusionMFD_ASC.cc
                           # https://github.com/56th/Singleton-Logger
                           ${LOGGER_PATH}/SingletonLogger.cpp
+                          # tangram
+                          ${TANGRAM_PATH}/tangram/intersect/r2d.c
+                          ${TANGRAM_PATH}/tangram/intersect/r3d.c
+                          ###
                           PDE_DiffusionFV.cc PDE_DiffusionFVwithGravity.cc
                           PDE_DiffusionNLFV.cc PDE_DiffusionNLFVwithGravity.cc
                           PDE_DiffusionNLFVwithBndFaces.cc PDE_DiffusionNLFVwithBndFacesGravity.cc
