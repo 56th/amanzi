@@ -45,6 +45,9 @@ include_directories(${WHETSTONE_SOURCE_DIR})
 # https://github.com/56th/Singleton-Logger
 set(LOGGER_PATH /home/alexander/Documents/Singleton-Logger/sln/Sources/)
 include_directories(${LOGGER_PATH})
+# tangram
+set(TANGRAM_PATH /home/alexander/Documents/Amanzi/tangram/)
+include_directories(${TANGRAM_PATH})
 
 
 

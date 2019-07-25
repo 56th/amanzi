@@ -28,6 +28,9 @@
 // fancy colors for cout logging 
 #include "SingletonLogger.hpp"
 
+// mesh wrapper to work with tangram
+#include "wonton/wonton/mesh/amanzi/amanzi_mesh_wrapper.h"
+
 #include "PDE_DiffusionMFD_ASC.hh"
 #include "DiffusionReactionEqn.hh"
 #include "OutputXDMF.hh"
@@ -74,6 +77,12 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.buf << "numb of cells: " << numbOfCells << '\n'
                        << "numb of faces: " << numbOfFaces;
             logger.log();
+            logger.beg("tangram");
+                Wonton::Amanzi_Mesh_Wrapper meshWrapper(*mesh);
+                logger.buf << "numb of cells: " << meshWrapper.num_owned_cells() << '\n'
+                           << "numb of faces: " << meshWrapper.num_owned_faces();
+                logger.log();
+            logger.end();
         logger.end();
         logger.beg("set exact soln");
             DiffusionReactionEqn eqn;
