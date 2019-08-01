@@ -43,8 +43,8 @@
 #include "OutputXDMF.hh"
 
 Tensor constTensor(double c) {
-    Amanzi::WhetStone::Tensor K(3, 1);
-    K.PutScalar(c);
+    Tensor K(3, 2);
+    K.MakeDiagonal(c);
     return K;
 }
 
@@ -201,7 +201,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 auto const pHess = constTensor(0.);
                 eqn.pHess = [=](Node const &, double) { return pHess; };
             }
-            eqn.K = constTensor(k);;
+            eqn.K = constTensor(k);
             PDE_DiffusionMFD_ASC::BC bc;
             bc.type = PDE_DiffusionMFD_ASC::BCType::Dirichlet;
             bc.p = [=](Node const & x) { return true; };
@@ -331,5 +331,3 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.err(e.what());
     }
 }
-
-

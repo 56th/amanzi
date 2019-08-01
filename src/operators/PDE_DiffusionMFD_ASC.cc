@@ -39,7 +39,6 @@ namespace Amanzi {
         }
         WhetStone::DenseVector PDE_DiffusionMFD_ASC::getLocalRHS_(size_t c) const {
             return WhetStone::DenseVector(f_[c].size(), const_cast<double *>(f_[c].data()));
-
         }
         WhetStone::DenseVector PDE_DiffusionMFD_ASC::getLocalConcentrations_(size_t c, Epetra_MultiVector const & lambda) const {
             auto macroFacesIndicies = getMacroFacesIndicies_(c);
@@ -69,7 +68,7 @@ namespace Amanzi {
                     logger.pro(c + 1, ncells_owned);
                     auto n = meshMini_->numbOfMaterials(c);
                     f_[c].resize(n);
-                    for (size_t i = 0; i < n; ++i)
+                    for (size_t i = 0; i < n; ++i) 
                         f_[c][i] = f(meshMini_->centroid(c, i), t) * meshMini_->volume(c, i);
                 }
             logger.end();
