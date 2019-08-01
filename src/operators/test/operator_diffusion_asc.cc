@@ -37,6 +37,7 @@
 
 // mini-mesh
 #include "MeshMiniEmpty.hh"
+#include "MeshMiniTangram.hh"
 
 #include "PDE_DiffusionMFD_ASC.hh"
 #include "DiffusionReactionEqn.hh"
@@ -96,6 +97,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 logger.inp("set reaction coef", c);
             logger.end();
             auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
+            auto meshMiniIndex = logger.opt("mini-mesh type", { "empty", "tangram" });
             logger.exp("stdin.txt");
         logger.end();
         logger.beg("load mesh");
@@ -174,12 +176,16 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                             cmp_ptr->add_matpoly(cell_matpoly);
                             cellmatpoly_list[icell] = cmp_ptr;
                         }
+                    if (cellmatpoly_list.size() != numbOfCells)
+                        throw std::logic_error("cellmatpoly_list.size() != numbOfCells");
                     write_to_gmv(cellmatpoly_list, ioNameBase + "_mof.gmv");
                 logger.end();
             logger.end();
         logger.end();
         logger.beg("set up mini-mesh");
-            Teuchos::RCP<const MeshMini> meshMini = Teuchos::rcp(new MeshMiniEmpty(mesh));
+            Teuchos::RCP<const MeshMini> meshMini;
+            if (meshMiniIndex == 0) meshMini = Teuchos::rcp(new MeshMiniEmpty(mesh));
+            else meshMini = Teuchos::rcp(new MeshMiniTangram(mesh, cellmatpoly_list));
         logger.end();
         logger.beg("set exact soln");
             DiffusionReactionEqn eqn;
