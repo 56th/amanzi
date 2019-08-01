@@ -25,25 +25,6 @@ namespace Amanzi {
         double PDE_DiffusionMFD_ASC::getMoment_(size_t m, size_t faceIndex, ScalarFunc const & f, double t = 0.) const {
             if (m != 0) throw std::invalid_argument("getMoment: not implemented for m > 0");
             return f(mesh_->face_centroid(faceIndex), t);
-            // auto const n  = mesh_->face_normal(faceIndex);
-            // auto const c  = mesh_->face_centroid(faceIndex);
-            // if (fpEqual(n[2], 0.)) return f(c, t);
-            // auto const nc = n * c;
-            // auto z = [&](double x, double y) {
-            //     return (nc - n[0] * x - n[1] * y) / n[2];
-            // };
-            // auto zX = -n[0] / n[2];
-            // auto zY = -n[1] / n[2];
-            // std::vector<Node> coords;
-            // mesh_->face_get_coordinates(faceIndex, &coords);
-            // for (auto& coord : coords) coord[2] = 0.;
-            // double area;
-            // Node normal(3), centroid(3);
-            // AmanziGeometry::polygon_get_area_centroid_normal(coords, &area, &centroid, &normal);
-            // return sqrt(1. + zX * zX + zY * zY) * area * f(Node(centroid[0], centroid[1], z(centroid[0], centroid[1])), t) / mesh_->face_area(faceIndex);
-        }
-        size_t PDE_DiffusionMFD_ASC::numbOfMaterials_(size_t c) const {
-            return 1;
         }
         AmanziMesh::Entity_ID_List PDE_DiffusionMFD_ASC::getMacroFacesIndicies_(size_t c) const {
             AmanziMesh::Entity_ID_List macroFacesIndicies;
@@ -57,7 +38,8 @@ namespace Amanzi {
             return macroFacesNormalsDirs;
         }
         WhetStone::DenseVector PDE_DiffusionMFD_ASC::getLocalRHS_(size_t c) const {
-            return WhetStone::DenseVector(1, const_cast<double *>(f_[c].data()));
+            return WhetStone::DenseVector(f_[c].size(), const_cast<double *>(f_[c].data()));
+
         }
         WhetStone::DenseVector PDE_DiffusionMFD_ASC::getLocalConcentrations_(size_t c, Epetra_MultiVector const & lambda) const {
             auto macroFacesIndicies = getMacroFacesIndicies_(c);
@@ -67,13 +49,15 @@ namespace Amanzi {
                 lambdaCoarse(i) = lambda[0][macroFacesIndicies[i]];
             return backSubstLocalMatrices_[c].R * lambdaCoarse;
         }
-        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::setDiffusion(TensorFunc const & K, double t = 0.) {
+        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::setDiffusion(TensorFuncInd const & K) {
             auto& logger = SingletonLogger::instance();
             logger.beg("set diffusion");
                 for (size_t c = 0; c < ncells_owned; ++c) {
                     logger.pro(c + 1, ncells_owned);
-                    K_[c].resize(1);
-                    K_[c][0] = K(mesh_->cell_centroid(c), t);
+                    auto n = meshMini_->numbOfMaterials(c);
+                    K_[c].resize(n);
+                    for (size_t i = 0; i < n; ++i)
+                        K_[c][i] = K(meshMini_->materialIndex(c, i));
                 }
             logger.end();
             return *this;
@@ -83,8 +67,10 @@ namespace Amanzi {
             logger.beg("set rhs");
                 for (size_t c = 0; c < ncells_owned; ++c) {
                     logger.pro(c + 1, ncells_owned);
-                    f_[c].resize(1);
-                    f_[c][0] = f(mesh_->cell_centroid(c), t) * mesh_->cell_volume(c);
+                    auto n = meshMini_->numbOfMaterials(c);
+                    f_[c].resize(n);
+                    for (size_t i = 0; i < n; ++i)
+                        f_[c][i] = f(meshMini_->centroid(c, i), t) * meshMini_->volume(c, i);
                 }
             logger.end();
             return *this;
@@ -112,7 +98,8 @@ namespace Amanzi {
                     }
                 }
                 mean /= area;
-                logger.buf << "numb of bndry faces:      " << n << '\n'
+                logger.buf 
+                        << "numb of bndry faces:      " << n << '\n'
                         << "bndry area:               " << area << '\n'
                         << "concentration bndry mean: " << mean << '\n'
                         << "numb of curved faces:     " << m;
@@ -192,50 +179,63 @@ namespace Amanzi {
         PDE_DiffusionMFD_ASC::LocalSystem PDE_DiffusionMFD_ASC::assembleLocalSystem_(size_t c) {
             auto& logger = SingletonLogger::instance();
             LocalSystem res;
-            auto macroFacesIndicies = getMacroFacesIndicies_(c);
-            auto macroFacesNormalsDirs = getMacroFacesNormalDirs_(c);
-            auto numbOfMacroFaces = macroFacesIndicies.size();
-            // mass matrix
-            // res.W.Reshape(numbOfMacroFaces, numbOfMacroFaces);
-            // auto W = res.W;
-            // if (MFD_.MassMatrixInverse(c, K_[c][0], W) == WhetStone::WHETSTONE_ELEMENTAL_MATRIX_FAILED) 
-            //     throw std::logic_error("MFD: unexpected failure in WhetStone for mass matrix");
-            std::vector<Node> fc(numbOfMacroFaces), fn(numbOfMacroFaces);
-            std::vector<double> fa(numbOfMacroFaces);
-            for (size_t i = 0; i < numbOfMacroFaces; ++i) {
-                auto f = macroFacesIndicies[i];
-                fc[i] = mesh_->face_centroid(f);
-                fn[i] = macroFacesNormalsDirs[i] * mesh_->face_normal(f);
-                fn[i] /= AmanziGeometry::norm(fn[i]);
-                fa[i] = mesh_->face_area(f);
+            auto numbOfMacroFaces = getMacroFacesIndicies_(c).size();
+            auto numbOfMiniCells = meshMini_->numbOfMaterials(c);
+            auto numbOfMiniFaces = meshMini_->numbOfFaces(c);
+            auto numbOfExtMiniFaces = meshMini_->numbOfExtFaces(c);
+            // interpolation matrix
+            res.R.Reshape(numbOfExtMiniFaces, numbOfMacroFaces);
+            res.R.PutScalar(0.);
+            for (size_t i = 0; i < numbOfExtMiniFaces; ++i)
+                res.R(i, meshMini_->parentFaceLocalIndex(c, i)) = 1.;
+            // pressure mass matrix
+            res.Sigma.Reshape(numbOfMiniCells, numbOfMiniCells);
+            res.Sigma.PutScalar(0.);
+            // - concentration mass matrix
+            res.C.Reshape(numbOfExtMiniFaces, numbOfExtMiniFaces);
+            res.C.PutScalar(0.);
+            for (size_t i = 0; i < numbOfExtMiniFaces; ++i) 
+                res.C(i, i) = -meshMini_->area(c, i);
+            // concentration "interpolation" matrix
+            res.E.Reshape(numbOfMiniFaces, numbOfExtMiniFaces);
+            res.E.PutScalar(0.);
+            for (size_t i = 0; i < numbOfExtMiniFaces; ++i)
+                res.E(i, i) = 1.;
+            // inverse mass matrix
+            res.W.Reshape(numbOfMiniFaces, numbOfMiniFaces);
+            res.W.PutScalar(0.);
+            // div matrix
+            res.mB.Reshape(numbOfMiniCells, numbOfMiniFaces);
+            res.mB.PutScalar(0.);
+            // assemble
+            for (size_t m = 0; m < numbOfMiniCells; ++m) {
+                auto ind = meshMini_->facesGlobalIndicies(c, m);
+                auto n = ind.size();
+                // pressure mass matrix
+                res.Sigma(m, m) = meshMini_->volume(c, m);
+                // div matrix
+                for (auto j : ind)
+                    res.mB(m, j) += meshMini_->area(c, j);
+                // inverse mass matrix
+                WhetStone::DenseMatrix locW;
+                std::vector<Node> fc(n), fn(n);
+                std::vector<double> fa(n);
+                for (size_t i = 0; i < n; ++i) {
+                    auto f = ind[i];
+                    fc[i] = meshMini_->faceCentroid(c, f);
+                    fn[i] = meshMini_->normal(c, f); // sign!
+                    fn[i] /= AmanziGeometry::norm(fn[i]);
+                    fa[i] = meshMini_->area(c, f);
+                }
+                if (MFD_.MassMatrixInverse(meshMini_->centroid(c, m), meshMini_->volume(c, m), fc, fn, fa, K_[c][m], locW, false /* no rescaling! */) == WhetStone::WHETSTONE_ELEMENTAL_MATRIX_FAILED)
+                    throw std::logic_error("MFD: unexpected failure in WhetStone for mass matrix");
+                for (size_t i = 0; i < n; ++i)
+                    for (size_t j = 0; j < n; ++j)
+                        res.W(ind[i], ind[j]) += locW(i, j);
             }
-            if (MFD_.MassMatrixInverse(mesh_->cell_centroid(c), mesh_->cell_volume(c), fc, fn, fa, K_[c][0], res.W, false /* no rescaling! */) == WhetStone::WHETSTONE_ELEMENTAL_MATRIX_FAILED)
-                throw std::logic_error("MFD: unexpected failure in WhetStone for mass matrix");
             double diff;
             if (!massMatrixIsExact_(res.W, c, &diff))
                 logger.wrn("cell #" + std::to_string(c) + ": mass matrix is not exact for const fields, diff = " + std::to_string(diff));
-            // div matrix
-            res.mB.Reshape(1, numbOfMacroFaces);
-            for (size_t i = 0; i < numbOfMacroFaces; ++i) 
-                res.mB(0, i) = mesh_->face_area(macroFacesIndicies[i]);
-            // pressure mass matrix
-            res.Sigma.Reshape(1, 1);
-            res.Sigma(0, 0) = mesh_->cell_volume(c);
-            // concentration "interpolation" matrix
-            res.E.Reshape(numbOfMacroFaces, numbOfMacroFaces);
-            res.E.PutScalar(0.);
-            for (size_t i = 0; i < numbOfMacroFaces; ++i)
-                res.E(i, i) = 1.;
-            // - concentration mass matrix
-            res.C.Reshape(numbOfMacroFaces, numbOfMacroFaces);
-            res.C.PutScalar(0.);
-            for (size_t i = 0; i < numbOfMacroFaces; ++i) 
-                res.C(i, i) = -mesh_->face_area(macroFacesIndicies[i]);
-            // interpolation matrix
-            res.R.Reshape(numbOfMacroFaces, numbOfMacroFaces);
-            res.R.PutScalar(0.);
-            for (size_t i = 0; i < numbOfMacroFaces; ++i)
-                res.R(i, i) = 1.;
             return res;
         }
         PDE_DiffusionMFD_ASC::BackSubstLocalMatrices PDE_DiffusionMFD_ASC::computeBackSubstLocalMatrices_(LocalSystem const & localSystem) {
@@ -260,6 +260,7 @@ namespace Amanzi {
             auto& u      = *U.ViewComponent("face", true);
             std::vector<bool> vis(nfaces_owned, false);
             auto l2 = 0.;
+            logger.wrn("TODO: use BCs to correct vals of lambdaFine");
             for (size_t c = 0; c < ncells_owned; ++c) {
                 logger.pro(c + 1, ncells_owned);
                 auto& W = backSubstLocalMatrices_[c].W;
@@ -271,26 +272,20 @@ namespace Amanzi {
                 auto pLocal = BWBt_plus_cSigma_inv * (getLocalRHS_(c) + BW * EC * lambdaFine);
                 // recover flux vals
                 auto uLocal = W * EC * lambdaFine - BW.t() * pLocal;
-
-                // AmanziMesh::Entity_ID_List macroFacesIndicies;
-                // std::vector<int> macroFacesNormalsDirs;
-                // mesh_->cell_get_faces_and_dirs(c, &macroFacesIndicies, &macroFacesNormalsDirs);
-                // auto div = 0.;
-                // for (size_t i = 0; i < macroFacesIndicies.size(); ++i)
-                //     div += macroFacesNormalsDirs[i] * uLocal(i) * mesh_->face_area(macroFacesIndicies[i]);
-                // logger.buf << c << ": div = " << div;
-                // logger.log();
-
                 // global pressure cell vals
-                for (size_t i = 0; i < numbOfMaterials_(c); ++i)
+                for (size_t i = 0; i < pLocal.NumRows(); ++i)
                     p[i][c] = pLocal(i);   
                 // global fluxes     
                 auto macroFacesIndicies = getMacroFacesIndicies_(c);
                 for (size_t i = 0; i < macroFacesIndicies.size(); ++i) {
                     auto f = macroFacesIndicies[i];
-                    if (vis[f]) l2 += pow(u[0][f] + uLocal(i), 2.) * mesh_->face_area(f);
+                    auto uF = 0.;
+                    for (auto j : meshMini_->childrenFacesGlobalIndicies(c, i)) 
+                        uF += uLocal(j) * meshMini_->area(c, j);
+                    uF /= mesh_->face_area(f);
+                    if (vis[f]) l2 += pow(u[0][f] + uF, 2.) * mesh_->face_area(f);
                     else {
-                        u[0][f] = uLocal(i);
+                        u[0][f] = uF;
                         vis[f] = true;
                     }
                 }
@@ -306,8 +301,9 @@ namespace Amanzi {
             return *this;
         }
         PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::computeExactCellVals(Epetra_MultiVector& res, ScalarFunc const & p, double t = 0.) {
-            for (size_t c = 0; c < ncells_owned; ++c) 
-                res[0][c] = p(mesh_->cell_centroid(c), t);
+            for (size_t C = 0; C < ncells_owned; ++C) 
+                for (size_t c = 0; c < meshMini_->numbOfMaterials(C); ++c)
+                    res[c][C] = p(meshMini_->centroid(C, c), t);
             return *this;
         }
         bool PDE_DiffusionMFD_ASC::massMatrixIsExact_(WhetStone::DenseMatrix const & W, size_t c, double* diff) const {

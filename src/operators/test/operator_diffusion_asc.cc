@@ -35,6 +35,9 @@
 #include "tangram/reconstruct/MOF.h"
 #include "tangram/utility/get_material_moments.h"
 
+// mini-mesh
+#include "MeshMiniEmpty.hh"
+
 #include "PDE_DiffusionMFD_ASC.hh"
 #include "DiffusionReactionEqn.hh"
 #include "OutputXDMF.hh"
@@ -175,6 +178,9 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 logger.end();
             logger.end();
         logger.end();
+        logger.beg("set up mini-mesh");
+            Teuchos::RCP<const MeshMini> meshMini = Teuchos::rcp(new MeshMiniEmpty(mesh));
+        logger.end();
         logger.beg("set exact soln");
             DiffusionReactionEqn eqn;
             eqn.c = c;
@@ -195,8 +201,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 auto const pHess = constTensor(0.);
                 eqn.pHess = [=](Node const &, double) { return pHess; };
             }
-            auto const K = constTensor(k);
-            eqn.K = [=](Node const &, double) { return K; };
+            eqn.K = constTensor(k);;
             PDE_DiffusionMFD_ASC::BC bc;
             bc.type = PDE_DiffusionMFD_ASC::BCType::Dirichlet;
             bc.p = [=](Node const & x) { return true; };
@@ -204,8 +209,10 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.end();
         logger.beg("set up operator");
             auto olist = plist.sublist("PK operator").sublist("diffusion operator asc");
-            PDE_DiffusionMFD_ASC op(olist, mesh);
-            op.setDiffusion(eqn.K, 0.).setReaction(eqn.c).setRHS(eqn.f(), 0.).setBC(bc, 0.).assembleLocalConsentrationSystems();
+            PDE_DiffusionMFD_ASC op(olist, meshMini);
+            op.setDiffusion([=](size_t) {
+                return constTensor(k);
+            }).setReaction(eqn.c).setRHS(eqn.f(), 0.).setBC(bc, 0.).assembleLocalConsentrationSystems();
             CompositeVectorSpace cvsP, cvsU;
             cvsP.SetMesh(mesh)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, 1);
             cvsP.AddComponent("face", AmanziMesh::FACE, 1);

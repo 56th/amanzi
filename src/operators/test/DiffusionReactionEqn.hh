@@ -1,4 +1,3 @@
-
 #ifndef DIFFUSION_REACTION_EQN_
 #define DIFFUSION_REACTION_EQN_
 
@@ -17,17 +16,16 @@ struct DiffusionReactionEqn {
     VectorFunc pGrad; // and its gradient
     TensorFunc pHess; // and its hessian
     double c; // reaction coef
-    TensorFunc K; // diffusion coef
+    Tensor K; // diffusion coef
     VectorFunc u() { // flux
         return [=](Node const & x, double t = 0.) {
-            return -(K(x, t) * pGrad(x, t));
+            return -(K * pGrad(x, t));
         };
     }
     ScalarFunc f() {
         return [=](Node const & x, double t = 0.) {
-            auto K0 = K(x, t);
             auto pHess0 = pHess(x, t);
-            return -(K0(0, 0) * pHess0(0, 0) + K0(1, 1) * pHess0(1, 1) + K0(2, 2) * pHess0(2, 2)) + c * p(x, t);
+            return -(K(0, 0) * pHess0(0, 0) + K(1, 1) * pHess0(1, 1) + K(2, 2) * pHess0(2, 2)) + c * p(x, t);
         };
     }
 };

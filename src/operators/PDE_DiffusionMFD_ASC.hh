@@ -6,6 +6,7 @@
 #include "PDE_Abstract.hh"
 #include "WhetStoneDefs.hh"
 #include "MFD3D_Diffusion.hh"
+#include "MeshMini.hh"
 
 inline bool fpEqual(double a, double b, double tol = 1e-8) {
     return fabs(a - b) < tol;
@@ -17,7 +18,7 @@ namespace Amanzi {
         public:
             using Node = AmanziGeometry::Point;
             using ScalarFunc = std::function<double(Node const &, double)>;
-            using TensorFunc = std::function<WhetStone::Tensor(Node const &, double)>;
+            using TensorFuncInd = std::function<WhetStone::Tensor(size_t)>;
             using Predicate = std::function<bool(Node const &)>;
             enum class BCType { Dirichlet, Neumann };
             struct BC {
@@ -40,10 +41,11 @@ namespace Amanzi {
                 WhetStone::DenseMatrix W;
                 WhetStone::DenseMatrix R;
             };
-            PDE_DiffusionMFD_ASC(Teuchos::ParameterList& plist, Teuchos::RCP<const AmanziMesh::Mesh> const & mesh)
-                : PDE_Abstract(plist, mesh)
+            PDE_DiffusionMFD_ASC(Teuchos::ParameterList& plist, Teuchos::RCP<const AmanziMesh::MeshMini> const & mesh)
+                : PDE_Abstract(plist, mesh->macroMesh())
+                , meshMini_(mesh)
                 , plist_(plist)
-                , MFD_(mesh) 
+                , MFD_(mesh->macroMesh()) 
                 , backSubstLocalMatrices_(ncells_owned) 
                 , K_(ncells_owned)
                 , f_(ncells_owned) {
@@ -54,19 +56,19 @@ namespace Amanzi {
             PDE_DiffusionMFD_ASC& computeExactConcentrations(Epetra_MultiVector&, ScalarFunc const &, double);
             PDE_DiffusionMFD_ASC& computeExactCellVals(Epetra_MultiVector&, ScalarFunc const &, double);
             PDE_DiffusionMFD_ASC& recoverSolution(CompositeVector&, CompositeVector&);
-            PDE_DiffusionMFD_ASC& setDiffusion(TensorFunc const &, double);
+            PDE_DiffusionMFD_ASC& setDiffusion(TensorFuncInd const &);
             PDE_DiffusionMFD_ASC& setRHS(ScalarFunc const &, double);
             PDE_DiffusionMFD_ASC& setReaction(double);
             PDE_DiffusionMFD_ASC& setBC(BC const &, double);
         private:
             Teuchos::ParameterList plist_;
+            Teuchos::RCP<const AmanziMesh::MeshMini> meshMini_;
             std::vector<BackSubstLocalMatrices> backSubstLocalMatrices_;
             std::vector<WhetStone::DenseMatrix>& S_ = local_op_->matrices; // local concentration matrices
             std::vector<std::vector<WhetStone::Tensor>> K_; // diffusion tensor
             std::vector<std::vector<double>> f_; // rhs
             double c_ = 0.; // reaction / accum coef
             WhetStone::MFD3D_Diffusion MFD_;
-            size_t numbOfMaterials_(size_t) const;
             AmanziMesh::Entity_ID_List getMacroFacesIndicies_(size_t) const;
             std::vector<int> getMacroFacesNormalDirs_(size_t) const;
             WhetStone::DenseVector getLocalRHS_(size_t) const;
