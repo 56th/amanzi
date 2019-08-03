@@ -49,6 +49,7 @@ Tensor constTensor(double c) {
     return K;
 }
 
+// tangram helpers
 template<typename T>
 std::istream& operator>>(std::istream& inp, T& vec) {
     for (size_t i = 0; i < 3; ++i) inp >> vec[i];
@@ -56,6 +57,12 @@ std::istream& operator>>(std::istream& inp, T& vec) {
 }
 template std::istream& operator>>(std::istream&, Tangram::Point3&);
 template std::istream& operator>>(std::istream&, Tangram::Vector3&);
+bool operator==(Tangram::Vector3 const & u, Tangram::Vector3 const & v) {
+    return u[0] == v[0] && u[1] == v[1] && u[2] == v[2]; 
+}
+bool operator!=(Tangram::Vector3 const & u, Tangram::Vector3 const & v) {
+    return !(u == v); 
+}
 
 TEST(OPERATOR_DIFFUSION_ASC) {
     using namespace Teuchos;
@@ -98,6 +105,9 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.end();
             auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
             auto meshMiniIndex = logger.opt("mini-mesh type", { "empty", "tangram" });
+            if (n1 != n2 && meshMiniIndex == 1)
+                logger.wrn("tangram does not divede T-junction face into two subface; this case currently is not handled by ASC");
+            auto meshMiniCheck = logger.yes("check mini-mesh");
             logger.exp("stdin.txt");
         logger.end();
         logger.beg("load mesh");
@@ -185,7 +195,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.beg("set up mini-mesh");
             Teuchos::RCP<const MeshMini> meshMini;
             if (meshMiniIndex == 0) meshMini = Teuchos::rcp(new MeshMiniEmpty(mesh));
-            else meshMini = Teuchos::rcp(new MeshMiniTangram(mesh, cellmatpoly_list));
+            else meshMini = Teuchos::rcp(new MeshMiniTangram(mesh, cellmatpoly_list, meshMiniCheck));
         logger.end();
         logger.beg("set exact soln");
             DiffusionReactionEqn eqn;
