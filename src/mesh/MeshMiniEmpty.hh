@@ -58,8 +58,8 @@ namespace Amanzi {
                 AmanziMesh::Entity_ID_List macroFacesIndicies;
                 std::vector<int> macroFacesNormalsDirs;
                 mesh_->cell_get_faces_and_dirs(C, &macroFacesIndicies, &macroFacesNormalsDirs);
-                auto f = macroFacesIndicies[g];
-                return macroFacesNormalsDirs[g] * mesh_->face_normal(f);
+                auto n = macroFacesNormalsDirs[g] * mesh_->face_normal(macroFacesIndicies[g]);
+                return n / AmanziGeometry::norm(n);
             }
             size_t parentFaceLocalIndex(size_t C, size_t g) const final {
                 return g;

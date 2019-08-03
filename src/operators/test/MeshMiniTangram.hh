@@ -29,6 +29,19 @@ namespace Amanzi {
             std::vector<std::shared_ptr<Tangram::CellMatPoly<3>>> polyCells_;
             std::vector<std::unordered_map<size_t, size_t>> faceRenum_;
             std::vector<size_t> numbOfExtFaces_;
+            std::vector<Tangram::Point<3>> vertices_(size_t C) const {
+                std::vector<Tangram::Point<3>> pts;
+                auto nv = polyCells_[C]->num_matvertices();
+                pts.reserve(nv);
+                for (size_t i = 0; i < nv; ++i)
+                    pts.push_back(polyCells_[C]->matvertex_point(i));
+                // auto& logger = SingletonLogger::instance();
+                // for (auto p : pts)
+                //     logger.buf << "{ " << p << " }, ";    
+                // logger.buf << '\n' << polyCells_[C]->matface_vertices(g);
+                // logger.log();
+                return pts;
+            }
         public:
             MeshMiniTangram(
                 Teuchos::RCP<const Mesh> const & mesh, 
@@ -66,6 +79,22 @@ namespace Amanzi {
                             auto f2 = x.facesGlobalIndicies(C, 0);
                             if (f1 != f2) 
                                 logger.buf << "SMC #" << C << ": faces global indicies {" << f1 << "} != {" << f2 << "}\n";
+                            // face areas, centroids, and normals
+                            for (auto g : f1) {
+                                auto diff = fabs(area(C, g) - x.area(C, g));
+                                if (!fpEqual(diff, 0.))
+                                    logger.buf << "SMC #" << C << ": face #" << g << " area     diff = " << diff << ",\t" << area(C, g) << " vs. " << x.area(C, g) << '\n';
+                                auto c1 = faceCentroid(C, g);
+                                auto c2 = x.faceCentroid(C, g);
+                                diff = AmanziGeometry::norm(c1 - c2);
+                                if (!fpEqual(diff, 0.))
+                                    logger.buf << "SMC #" << C << ": face #" << g << " centroid diff = " << diff << ",\t" << c1 << " vs. " << c2 << '\n';
+                                auto n1 = normal(C, g);
+                                auto n2 = x.normal(C, g);
+                                diff = AmanziGeometry::norm(n1 - n2);
+                                if (!fpEqual(diff, 0.))
+                                    logger.buf << "SMC #" << C << ": face #" << g << " normal   diff = " << diff << ",\t" << n1 << " vs. " << n2 << '\n';
+                            }
                             // centroids
                             auto c1 = centroid(C, 0);
                             auto c2 = x.centroid(C, 0);
@@ -116,16 +145,16 @@ namespace Amanzi {
             AmanziGeometry::Point faceCentroid(size_t C, size_t g) const final {
                 g = faceRenum_[C].at(g);
                 std::vector<double> a;
-                Tangram::polygon3d_moments(polyCells_[C]->matface_points(g), polyCells_[C]->matface_vertices(g), a);
+                Tangram::polygon3d_moments(vertices_(C), polyCells_[C]->matface_vertices(g), a);
                 return AmanziGeometry::Point(a[1] / a[0], a[2] / a[0], a[3] / a[0]);
             }
             double area(size_t C, size_t g) const final {
                 g = faceRenum_[C].at(g);
-                return Tangram::polygon3d_area(polyCells_[C]->matface_points(g), polyCells_[C]->matface_vertices(g));
+                return Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(g));
             }
             AmanziGeometry::Point normal(size_t C, size_t g) const final {
                 g = faceRenum_[C].at(g);
-                auto a = Tangram::polygon3d_normal(polyCells_[C]->matface_points(g), polyCells_[C]->matface_vertices(g));
+                auto a = Tangram::polygon3d_normal(vertices_(C), polyCells_[C]->matface_vertices(g));
                 // check dir
                 return AmanziGeometry::Point(a[0], a[1], a[2]);
             }
