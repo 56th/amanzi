@@ -63,6 +63,9 @@ namespace Amanzi {
             bool fpEqual_(double a, double b, double tol = 1e-6) const {
                     return std::fabs(a - b) < tol;
             }
+            int sgn_(double val) const {
+                return (0. < val) - (val < 0.);
+            }
         public:
             MeshMiniTangram(
                 Teuchos::RCP<const Mesh> const & mesh, 
@@ -208,9 +211,20 @@ namespace Amanzi {
             }
             AmanziGeometry::Point normal(size_t C, size_t g) const final {
                 g = faceRenum_[C].at(g);
-                auto a = Tangram::polygon3d_normal(vertices_(C), polyCells_[C]->matface_vertices(g));
-                // check dir
-                return AmanziGeometry::Point(a[0], a[1], a[2]);
+                auto tmp = Tangram::polygon3d_normal(vertices_(C), polyCells_[C]->matface_vertices(g));
+                auto a = AmanziGeometry::Point(tmp[0], tmp[1], tmp[2]);
+                if (g >= numbOfExtFaces(C)) return a;
+                // correct normal dir for ext faces
+                auto i = parentFaceLocalIndex(C, g);
+                auto b = macroFacesNormalsDirs(C)[i] * mesh_->face_normal(macroFacesIndicies(C)[i]);
+                b /= AmanziGeometry::norm(b);
+                auto s = sgn_(a * b);
+                if (s == 0) {
+                    std::stringstream err;
+                    err << __func__ << ": cell #" << C << ": mini-face #" << g << " and its parent face have perp normals";
+                    throw std::invalid_argument(err.str());
+                }
+                return s * a;
             }
             size_t parentFaceLocalIndex(size_t C, size_t g) const final {
                 if (g >= numbOfExtFaces(C)) {
