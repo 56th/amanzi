@@ -9,7 +9,7 @@
 #include "MeshMini.hh"
 
 inline bool fpEqual(double a, double b, double tol = 1e-8) {
-    return fabs(a - b) < tol;
+    return std::fabs(a - b) < tol;
 }
 
 namespace Amanzi {
