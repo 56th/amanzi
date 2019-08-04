@@ -42,6 +42,17 @@ namespace Amanzi {
                 // logger.log();
                 return pts;
             }
+            bool pointProjectionLiesInTriangle_(
+                AmanziGeometry::Point const & p,
+                AmanziGeometry::Point const & t1,
+                AmanziGeometry::Point const & t2,
+                AmanziGeometry::Point const & t3
+            ) const {
+                return true;
+            }
+            bool fpEqual_(double a, double b, double tol = 1e-8) const {
+                    return fabs(a - b) < tol;
+            }
         public:
             MeshMiniTangram(
                 Teuchos::RCP<const Mesh> const & mesh, 
@@ -68,9 +79,6 @@ namespace Amanzi {
                 }
                 if (!check) return;
                 MeshMiniEmpty x(mesh);
-                auto fpEqual = [](double a, double b, double tol = 1e-8) {
-                    return fabs(a - b) < tol;
-                };
                 logger.beg("check mini-mesh");
                     for (size_t C = 0; C < n; ++C) {
                         if (numbOfMaterials(C) == 1) {
@@ -82,38 +90,35 @@ namespace Amanzi {
                             // face areas, centroids, and normals
                             for (auto g : f1) {
                                 auto diff = fabs(area(C, g) - x.area(C, g));
-                                if (!fpEqual(diff, 0.))
+                                if (!fpEqual_(diff, 0.))
                                     logger.buf << "SMC #" << C << ": face #" << g << " area     diff = " << diff << ",\t" << area(C, g) << " vs. " << x.area(C, g) << '\n';
                                 auto c1 = faceCentroid(C, g);
                                 auto c2 = x.faceCentroid(C, g);
                                 diff = AmanziGeometry::norm(c1 - c2);
-                                if (!fpEqual(diff, 0.))
+                                if (!fpEqual_(diff, 0.))
                                     logger.buf << "SMC #" << C << ": face #" << g << " centroid diff = " << diff << ",\t" << c1 << " vs. " << c2 << '\n';
                                 auto n1 = normal(C, g);
                                 auto n2 = x.normal(C, g);
                                 diff = AmanziGeometry::norm(n1 - n2);
-                                if (!fpEqual(diff, 0.))
+                                if (!fpEqual_(diff, 0.))
                                     logger.buf << "SMC #" << C << ": face #" << g << " normal   diff = " << diff << ",\t" << n1 << " vs. " << n2 << '\n';
                             }
                             // centroids
                             auto c1 = centroid(C, 0);
                             auto c2 = x.centroid(C, 0);
-                            if (!fpEqual(AmanziGeometry::norm(c1 - c2), 0.))
+                            if (!fpEqual_(AmanziGeometry::norm(c1 - c2), 0.))
                                 logger.buf << "SMC #" << C << ": centroids err = " << AmanziGeometry::norm(c1 - c2) << '\n';
                             // volumes
                             auto v1 = volume(C, 0);
                             auto v2 = x.volume(C, 0);
-                            if (!fpEqual(v1 - v2, 0.))
+                            if (!fpEqual_(v1 - v2, 0.))
                                 logger.buf << "SMC #" << C << ": volume err = " << fabs(v1 - v2) << '\n';
                             if (logger.buf.tellp() != std::streampos(0)) logger.wrn();
                         }
                         else for (size_t c = 0; c < numbOfMaterials(C); ++c) {
-                            auto fInd = facesGlobalIndicies(C, c);
-                            // std::vector<std::string> fType;
-                            // fType.reserve(fInd.size());
-                            // for (auto i : fInd) fType.push_back(std::to_string(i) + (polyCells_[C]->matface_parent_kind(i) == Wonton::FACE ? "e" : "i"));
-                            if (numbOfMaterials(C) == 3) logger.buf << "MMC #" << C << "." << c << ": faces global indicies {" << fInd << "}\n";
-                            logger.log();
+                            // auto fInd = facesGlobalIndicies(C, c);
+                            // if (numbOfMaterials(C) == 3) logger.buf << "MMC #" << C << "." << c << ": faces global indicies {" << fInd << "}\n";
+                            // logger.log();
                         }
                     }
                 logger.end();
@@ -159,7 +164,27 @@ namespace Amanzi {
                 return AmanziGeometry::Point(a[0], a[1], a[2]);
             }
             size_t parentFaceLocalIndex(size_t C, size_t g) const final {
-                return g;
+                auto& logger = SingletonLogger::instance();
+                auto p = faceCentroid(C, g);
+                std::vector<AmanziGeometry::Point> coords;
+                auto ind = macroFacesIndicies(C);
+                std::vector<double> dist(ind.size(), std::numeric_limits<double>::max());
+                for (size_t j = 0; j < ind.size(); ++j) {
+                    auto f = ind[j];
+                    auto n = mesh_->face_normal(f);
+                    n /= AmanziGeometry::norm(n);
+                    auto centroid = mesh_->face_centroid(f);
+                    mesh_->face_get_coordinates(f, &coords);
+                    for (size_t i = 1; i < coords.size(); ++i)
+                        if (pointProjectionLiesInTriangle_(p, centroid, coords[i - 1], coords[i]))
+                            dist[j] = std::min(dist[j], std::fabs(n * (centroid - p)));
+                }
+                auto min = std::min_element(dist.begin(), dist.end());
+                if (!fpEqual_(*min, 0.)) {
+                    logger.buf << __func__ << ": cell #" << C << ": mini-face #" << g << " centroid / macro-face distance is " << *min;
+                    logger.wrn();
+                }
+                return std::distance(dist.begin(), min);
             }
         };
     }

@@ -69,8 +69,6 @@ namespace Amanzi {
             std::vector<std::vector<double>> f_; // rhs
             double c_ = 0.; // reaction / accum coef
             WhetStone::MFD3D_Diffusion MFD_;
-            AmanziMesh::Entity_ID_List getMacroFacesIndicies_(size_t) const;
-            std::vector<int> getMacroFacesNormalDirs_(size_t) const;
             WhetStone::DenseVector getLocalRHS_(size_t) const;
             WhetStone::DenseVector getLocalConcentrations_(size_t, Epetra_MultiVector const &) const;
             LocalSystem assembleLocalSystem_(size_t);

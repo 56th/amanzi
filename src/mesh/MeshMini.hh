@@ -29,6 +29,13 @@ namespace Amanzi {
             virtual size_t numbOfFaces(size_t C) const = 0;
             virtual size_t numbOfExtFaces(size_t C) const = 0;
             virtual size_t numbOfMaterials(size_t C) const = 0;
+            size_t maxNumbOfMaterials() const {
+                auto n = mesh_->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
+                size_t max = 0;
+                for (size_t i = 0; i < n; ++i)
+                    max = std::max(max, numbOfMaterials(i));
+                return max;
+            }
             virtual AmanziGeometry::Point centroid(size_t C, size_t c) const = 0;
             virtual size_t materialIndex(size_t C, size_t c) const = 0;
             virtual double volume(size_t C, size_t c) const = 0;
@@ -44,6 +51,17 @@ namespace Amanzi {
                     if (parentFaceLocalIndex(C, i) == F)
                         res.push_back(i);
                 return res;
+            }
+            Entity_ID_List macroFacesIndicies(size_t C) const {
+                Entity_ID_List macroFacesIndicies;
+                mesh_->cell_get_faces(C, &macroFacesIndicies);
+                return macroFacesIndicies;
+            }
+            std::vector<int> macroFacesNormalsDirs(size_t C) const {
+                Entity_ID_List macroFacesIndicies;
+                std::vector<int> macroFacesNormalsDirs;
+                mesh_->cell_get_faces_and_dirs(C, &macroFacesIndicies, &macroFacesNormalsDirs);
+                return macroFacesNormalsDirs;
             }
         };
     }

@@ -26,22 +26,11 @@ namespace Amanzi {
             if (m != 0) throw std::invalid_argument("getMoment: not implemented for m > 0");
             return f(mesh_->face_centroid(faceIndex), t);
         }
-        AmanziMesh::Entity_ID_List PDE_DiffusionMFD_ASC::getMacroFacesIndicies_(size_t c) const {
-            AmanziMesh::Entity_ID_List macroFacesIndicies;
-            mesh_->cell_get_faces(c, &macroFacesIndicies);
-            return macroFacesIndicies;
-        }
-        std::vector<int> PDE_DiffusionMFD_ASC::getMacroFacesNormalDirs_(size_t c) const {
-            AmanziMesh::Entity_ID_List macroFacesIndicies;
-            std::vector<int> macroFacesNormalsDirs;
-            mesh_->cell_get_faces_and_dirs(c, &macroFacesIndicies, &macroFacesNormalsDirs);
-            return macroFacesNormalsDirs;
-        }
         WhetStone::DenseVector PDE_DiffusionMFD_ASC::getLocalRHS_(size_t c) const {
             return WhetStone::DenseVector(f_[c].size(), const_cast<double *>(f_[c].data()));
         }
         WhetStone::DenseVector PDE_DiffusionMFD_ASC::getLocalConcentrations_(size_t c, Epetra_MultiVector const & lambda) const {
-            auto macroFacesIndicies = getMacroFacesIndicies_(c);
+            auto macroFacesIndicies = meshMini_->macroFacesIndicies(c);
             auto n = macroFacesIndicies.size();
             WhetStone::DenseVector lambdaCoarse(n);
             for (size_t i = 0; i < n; ++i) 
@@ -139,7 +128,7 @@ namespace Amanzi {
                     // local condensation vector
                     auto s = (R.t() * EC.t() * BW.t() * BWBt_plus_cSigma_inv) * getLocalRHS_(c);
                     // apply BC
-                    auto macroFacesIndicies = getMacroFacesIndicies_(c);
+                    auto macroFacesIndicies = meshMini_->macroFacesIndicies(c);
                     auto n = macroFacesIndicies.size();
                     // zero out rows
                     auto const & bcModelTest = bcs_test_[0]->bc_model();
@@ -178,7 +167,7 @@ namespace Amanzi {
         PDE_DiffusionMFD_ASC::LocalSystem PDE_DiffusionMFD_ASC::assembleLocalSystem_(size_t c) {
             auto& logger = SingletonLogger::instance();
             LocalSystem res;
-            auto numbOfMacroFaces = getMacroFacesIndicies_(c).size();
+            auto numbOfMacroFaces = meshMini_->macroFacesIndicies(c).size();
             auto numbOfMiniCells = meshMini_->numbOfMaterials(c);
             auto numbOfMiniFaces = meshMini_->numbOfFaces(c);
             auto numbOfExtMiniFaces = meshMini_->numbOfExtFaces(c);
@@ -233,7 +222,7 @@ namespace Amanzi {
                         res.W(ind[i], ind[j]) += locW(i, j);
             }
             double diff;
-            if (!massMatrixIsExact_(res.W, c, &diff))
+            if (numbOfMiniCells == 1 && !massMatrixIsExact_(res.W, c, &diff))
                 logger.wrn("cell #" + std::to_string(c) + ": mass matrix is not exact for const fields, diff = " + std::to_string(diff));
             return res;
         }
@@ -275,7 +264,7 @@ namespace Amanzi {
                 for (size_t i = 0; i < pLocal.NumRows(); ++i)
                     p[i][c] = pLocal(i);   
                 // global fluxes     
-                auto macroFacesIndicies = getMacroFacesIndicies_(c);
+                auto macroFacesIndicies = meshMini_->macroFacesIndicies(c);
                 for (size_t i = 0; i < macroFacesIndicies.size(); ++i) {
                     auto f = macroFacesIndicies[i];
                     auto uF = 0.;
@@ -308,8 +297,8 @@ namespace Amanzi {
         bool PDE_DiffusionMFD_ASC::massMatrixIsExact_(WhetStone::DenseMatrix const & W, size_t c, double* diff) const {
             auto M = W;
             M.Inverse();
-            auto macroFacesIndicies = getMacroFacesIndicies_(c);
-            auto macroFacesNormalsDirs = getMacroFacesNormalDirs_(c);
+            auto macroFacesIndicies = meshMini_->macroFacesIndicies(c);
+            auto macroFacesNormalsDirs = meshMini_->macroFacesNormalsDirs(c);
             auto numbOfMacroFaces = macroFacesIndicies.size();
             Node u(1., 2., 3.), v(4., 5., 6.);
             WhetStone::DenseVector uI(numbOfMacroFaces), vI(numbOfMacroFaces);

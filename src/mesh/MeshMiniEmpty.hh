@@ -16,9 +16,7 @@ namespace Amanzi {
         public:
             MeshMiniEmpty(Teuchos::RCP<const Mesh> const & mesh) : MeshMini(mesh) {}
             size_t numbOfFaces(size_t C) const final {
-                Entity_ID_List macroFacesIndicies;
-                mesh_->cell_get_faces(C, &macroFacesIndicies);
-                return macroFacesIndicies.size();
+                return macroFacesIndicies(C).size();
             }
             size_t numbOfExtFaces(size_t C) const final {
                 return numbOfFaces(C);
@@ -45,20 +43,13 @@ namespace Amanzi {
                 return res;
             }    
             AmanziGeometry::Point faceCentroid(size_t C, size_t g) const final {
-                Entity_ID_List macroFacesIndicies;
-                mesh_->cell_get_faces(C, &macroFacesIndicies);
-                return mesh_->face_centroid(macroFacesIndicies[g]);
+                return mesh_->face_centroid(macroFacesIndicies(C)[g]);
             }
-            virtual double area(size_t C, size_t g) const final {
-                Entity_ID_List macroFacesIndicies;
-                mesh_->cell_get_faces(C, &macroFacesIndicies);
-                return mesh_->face_area(macroFacesIndicies[g]);
+            double area(size_t C, size_t g) const final {
+                return mesh_->face_area(macroFacesIndicies(C)[g]);
             }
             AmanziGeometry::Point normal(size_t C, size_t g) const final {
-                AmanziMesh::Entity_ID_List macroFacesIndicies;
-                std::vector<int> macroFacesNormalsDirs;
-                mesh_->cell_get_faces_and_dirs(C, &macroFacesIndicies, &macroFacesNormalsDirs);
-                auto n = macroFacesNormalsDirs[g] * mesh_->face_normal(macroFacesIndicies[g]);
+                auto n = macroFacesNormalsDirs(C)[g] * mesh_->face_normal(macroFacesIndicies(C)[g]);
                 return n / AmanziGeometry::norm(n);
             }
             size_t parentFaceLocalIndex(size_t C, size_t g) const final {

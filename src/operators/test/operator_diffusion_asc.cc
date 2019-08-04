@@ -230,7 +230,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 return constTensor(k);
             }).setReaction(eqn.c).setRHS(eqn.f(), 0.).setBC(bc, 0.).assembleLocalConsentrationSystems();
             CompositeVectorSpace cvsP, cvsU;
-            cvsP.SetMesh(mesh)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, 1);
+            cvsP.SetMesh(mesh)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, meshMini->maxNumbOfMaterials());
             cvsP.AddComponent("face", AmanziMesh::FACE, 1);
             cvsU.SetMesh(mesh)->SetGhosted(true)->AddComponent("face", AmanziMesh::FACE, 1);
             auto  p     = CompositeVector(cvsP);
