@@ -8,6 +8,11 @@
 # stop after the first err
 add_definitions(-Wfatal-errors)
 
+# meshconvert
+set(MESHCONVERT ${ZLIB_ROOT}/bin/meshconvert)
+message(STATUS "meshconvert bin is ${MESHCONVERT}")
+add_definitions(-DMESHCONVERT=\"${MESHCONVERT}\")
+
 # Amanzi module, include files found in AMANZI_MODULE_PATH
 include(PrintVariable)
 include(TestManager)

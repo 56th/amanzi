@@ -108,6 +108,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             if (n1 != n2 && meshMiniIndex == 1)
                 logger.wrn("tangram does not divede T-junction face into two subface; this case currently is not handled by ASC");
             auto meshMiniCheck = logger.yes("check mini-mesh");
+            auto exportSoln = logger.yes("export to .hdf5");
             logger.exp("stdin.txt");
         logger.end();
         logger.beg("load mesh");
@@ -172,8 +173,6 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                     mof_driver.set_volume_fractions(cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids);
                     mof_driver.reconstruct();
                     auto cellmatpoly_list = mof_driver.cell_matpoly_ptrs();
-                logger.end();
-                logger.beg("export to .gmv");
                     // https://github.com/laristra/tangram/blob/master/app/test_mof/test_mof_3d.cc
                     // create MatPoly's for single-material cells
                     for (int icell = 0; icell < numbOfCells; icell++) 
@@ -188,7 +187,6 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                         }
                     if (cellmatpoly_list.size() != numbOfCells)
                         throw std::logic_error("cellmatpoly_list.size() != numbOfCells");
-                    write_to_gmv(cellmatpoly_list, ioNameBase + "_mof.gmv");
                 logger.end();
             logger.end();
         logger.end();
@@ -335,15 +333,50 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                        << "p_* mean:    " << pCellExactMean << '\n';
             logger.log();
         logger.end();
-        logger.beg("export to .hdf5");
-            Amanzi::OutputXDMF io(plist.get<Teuchos::ParameterList>("io"), mesh, true, false);
-            io.InitializeCycle(0., 0);
-            io.WriteVector(*pCell(0), "p_h", AmanziMesh::CELL);
-            // for (size_t c = 0; c < numbOfCells; ++c) pCellExact[1][c] = c;
-            // io.WriteMultiVector(pCellExact, { "p_*", "cell_numeration" });
-            io.WriteVector(*pCellExact(0), "p_*", AmanziMesh::CELL);
-            io.FinalizeCycle();
-        logger.end();
+        if (exportSoln) {
+            logger.beg("export soln (test/io/*)");
+                logger.beg("export tangram poly-cells to .gmv and convert to .exo");
+                    write_to_gmv(cellmatpoly_list, ioNameBase + "_mof.gmv");
+                    #ifdef MESHCONVERT
+                        std::string meshconvert = MESHCONVERT;
+                        auto code = system((meshconvert + ' ' + ioNameBase + "_mof.gmv " + ioNameBase + "_mof.exo").c_str()); 
+                    #endif
+                logger.end();
+                logger.beg("import .gmv mesh to amanzi and fletten soln vectors");
+                    auto meshFlattened = meshfactory.create(ioNameBase + "_mof.exo");
+                    auto numbOfCellsFlattened = meshFlattened->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
+                    auto numbOfFacesFlattened = meshFlattened->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::OWNED);
+                    logger.buf 
+                        << "numb of cells: " << numbOfCellsFlattened << '\n'
+                        << "numb of faces: " << numbOfFacesFlattened;
+                    logger.log();
+                    CompositeVectorSpace cvsFlattenedP;
+                    cvsFlattenedP.SetMesh(meshFlattened)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, 1);
+                    auto  pFlattened = CompositeVector(cvsFlattenedP);
+                    auto& pCellFlattened = *pFlattened.ViewComponent("cell", true);
+                    auto pCellExactFlattened = pCell;
+                    for (size_t C = 0, i = 0; C < numbOfCells; ++C) 
+                        for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c, ++i) {
+                            pCellFlattened[0][i] = pCell[c][C];
+                            pCellExactFlattened[0][i] = pCellExact[c][C];
+                        }
+                logger.end();
+                logger.beg("export to .hdf5");
+                    Amanzi::OutputXDMF io(plist.get<Teuchos::ParameterList>("io"), meshFlattened, true, false);
+                    io.InitializeCycle(0., 0);
+                    io.WriteVector(*pCellFlattened(0), "p_h", AmanziMesh::CELL);
+                    io.WriteVector(*pCellExactFlattened(0), "p_*", AmanziMesh::CELL);
+                    io.FinalizeCycle();
+                logger.end();
+                // Amanzi::OutputXDMF io(plist.get<Teuchos::ParameterList>("io"), mesh, true, false);
+                // io.InitializeCycle(0., 0);
+                // io.WriteVector(*pCell(0), "p_h", AmanziMesh::CELL);
+                // // for (size_t c = 0; c < numbOfCells; ++c) pCellExact[1][c] = c;
+                // // io.WriteMultiVector(pCellExact, { "p_*", "cell_numeration" });
+                // io.WriteVector(*pCellExact(0), "p_*", AmanziMesh::CELL);
+                // io.FinalizeCycle();
+            logger.end();
+        }
     } catch (std::exception const & e) {
         logger.err(e.what());
     }
