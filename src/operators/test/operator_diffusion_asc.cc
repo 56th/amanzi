@@ -319,11 +319,12 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             // logger.buf << "p_* - p_h:\n" << pCellDiff;
             // logger.log();
             double l2 = 0., vol = 0., pCellMean = 0., pCellExactMean = 0.;
-            for (size_t c = 0; c < numbOfCells; ++c) {
-                l2 += pow(pCellExact[0][c] - pCell[0][c], 2.) * mesh->cell_volume(c);
-                vol += mesh->cell_volume(c);
-                pCellMean += pCell[0][c] * mesh->cell_volume(c);
-                pCellExactMean += pCellExact[0][c] * mesh->cell_volume(c);
+            for (size_t C = 0; C < numbOfCells; ++C) 
+                for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c) {
+                    l2 += pow(pCellExact[c][C] - pCell[c][C], 2.) * meshMini->volume(C, c);
+                    vol += meshMini->volume(C, c);
+                    pCellMean += pCell[c][C] * meshMini->volume(C, c);
+                    pCellExactMean += pCellExact[c][C] * meshMini->volume(C, c);
             }
             pCellMean /= vol;
             pCellExactMean /= vol;
