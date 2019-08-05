@@ -108,7 +108,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             if (n1 != n2 && meshMiniIndex == 1)
                 logger.wrn("tangram does not divede T-junction face into two subface; this case currently is not handled by ASC");
             auto meshMiniCheck = logger.yes("check mini-mesh");
-            auto exportSoln = logger.yes("export to .hdf5");
+            auto exportWhat = logger.opt("export", { "mof mesh only", "soln", "none" });
             logger.exp("stdin.txt");
         logger.end();
         logger.beg("load mesh");
@@ -333,17 +333,36 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                        << "p_* mean:    " << pCellExactMean << '\n';
             logger.log();
         logger.end();
-        if (exportSoln) {
+        if (exportWhat == 0 || exportWhat == 1) {
+            logger.beg("export tangram poly-cells to .gmv and convert to .exo");
+                write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_mof.gmv");
+                #ifdef MESHCONVERT
+                    std::string meshconvert = MESHCONVERT;
+                    auto code = system((
+                        meshconvert + ' ' + ioNameBase + "_mof.gmv " + ioNameBase + "_mof.exo ; rm " + ioNameBase + "_mof.gmv"
+                    ).c_str()); 
+                #endif
+            logger.end();
+        }
+        if (exportWhat == 1) {
             logger.beg("export soln (test/io/*)");
-                logger.beg("export tangram poly-cells to .gmv and convert to .exo");
-                    write_to_gmv(cellmatpoly_list, ioNameBase + "_mof.gmv");
+                logger.beg("export tangram poly-cells to .gmv and convert to .exo w/o cell renumbering");
+                    for (auto& cmp : cellmatpoly_list) // we need it so meshconvert does not renumber cells
+                        for (auto& id : const_cast<std::vector<int>&>(cmp->matpoly_matids()))
+                            id = 0;
+                    for (auto& id : cell_mat_ids) id = 0;
+                    write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_flat.gmv");
+                    int code;
                     #ifdef MESHCONVERT
                         std::string meshconvert = MESHCONVERT;
-                        auto code = system((meshconvert + ' ' + ioNameBase + "_mof.gmv " + ioNameBase + "_mof.exo").c_str()); 
+                        code = system((
+                            meshconvert + ' ' + ioNameBase + "_flat.gmv " + ioNameBase + "_flat.exo ; rm " + ioNameBase + "_flat.gmv"
+                        ).c_str()); 
                     #endif
                 logger.end();
-                logger.beg("import .gmv mesh to amanzi and fletten soln vectors");
-                    auto meshFlattened = meshfactory.create(ioNameBase + "_mof.exo");
+                logger.beg("import .gmv mesh to amanzi and flatten soln vectors");
+                    auto meshFlattened = meshfactory.create(ioNameBase + "_flat.exo");
+                    code = system(("rm " + ioNameBase + "_flat.exo").c_str()); 
                     auto numbOfCellsFlattened = meshFlattened->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
                     auto numbOfFacesFlattened = meshFlattened->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::OWNED);
                     logger.buf 
@@ -354,12 +373,15 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                     cvsFlattenedP.SetMesh(meshFlattened)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, 1);
                     auto  pFlattened = CompositeVector(cvsFlattenedP);
                     auto& pCellFlattened = *pFlattened.ViewComponent("cell", true);
-                    auto pCellExactFlattened = pCell;
-                    for (size_t C = 0, i = 0; C < numbOfCells; ++C) 
+                    auto pCellExactFlattened = pCellFlattened;
+                    size_t i = 0;
+                    for (size_t C = 0; C < numbOfCells; ++C) 
                         for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c, ++i) {
                             pCellFlattened[0][i] = pCell[c][C];
                             pCellExactFlattened[0][i] = pCellExact[c][C];
                         }
+                    logger.buf << "flattened # of pressure d.o.f. = " << i;
+                    logger.log();
                 logger.end();
                 logger.beg("export to .hdf5");
                     Amanzi::OutputXDMF io(plist.get<Teuchos::ParameterList>("io"), meshFlattened, true, false);
