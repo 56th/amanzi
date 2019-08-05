@@ -87,6 +87,9 @@ namespace Amanzi {
                         logger.pro(C + 1, n);
                         std::string cellStr = numbOfMaterials(C) > 1 ? "MMC" : "SMC";
                         cellStr += " #" + std::to_string(C);
+
+                        // logger.log(cellStr);
+
                         std::unordered_map<size_t, size_t> freq;
                         for (size_t c = 0; c < numbOfMaterials(C); ++c)
                             for (auto const & i : polyCells_[C]->matpoly_faces(c)) ++freq[i];
@@ -94,7 +97,16 @@ namespace Amanzi {
                         for (auto const & f : freq) {
                             faceRenum_[C][f.first] = f.first;
                             if (f.second > 1) fInt.push_back(f.first);
+                        
+                            // logger.buf << f.first << " (" << f.second << "), ";
+                        
                         }
+
+                        // logger.buf << '\n';
+                        // for (auto const & v : vertices_(C))
+                        //     logger.buf << "{ " << v << " }\n";
+                        // logger.log();
+                        
                         for (size_t i = 0; i < fInt.size(); ++i) std::swap(faceRenum_[C][fInt[i]], faceRenum_[C][faceRenum_[C].size() - 1 - i]);
                         numbOfExtFaces_[C] = polyCells_[C]->num_matfaces() - fInt.size();
                         parentFaceLocalIndicies_[C].resize(numbOfExtFaces_[C]);
@@ -129,8 +141,14 @@ namespace Amanzi {
                 MeshMiniEmpty x(mesh);
                 logger.beg("check mini-mesh");
                     for (size_t C = 0; C < n; ++C) {
-                        if (numbOfMaterials(C) == 1) {
-                            auto cellStr = "SMC #" + std::to_string(C);
+                        std::string cellStr = numbOfMaterials(C) > 1 ? "MMC" : "SMC";
+                        cellStr += " #" + std::to_string(C);
+                        auto m = numbOfMaterials(C);
+                        auto nExt = numbOfExtFaces(C);
+                        auto nInt = numbOfFaces(C) - nExt;
+                        if (m == 1) {
+                            if (nInt != 0)
+                                logger.buf << cellStr << ": numb of int faces = " << nInt << " != 0\n";
                             // global mini-faces indicies consistency
                             auto f1 = facesGlobalIndicies(C, 0);
                             auto f2 = x.facesGlobalIndicies(C, 0);
@@ -168,13 +186,39 @@ namespace Amanzi {
                             auto v2 = x.volume(C, 0);
                             if (!fpEqual_(v1 - v2, 0.))
                                 logger.buf << cellStr << ": volume err = " << std::fabs(v1 - v2) << '\n';
-                            if (logger.buf.tellp() != std::streampos(0)) logger.wrn();
                         }
-                        else for (size_t c = 0; c < numbOfMaterials(C); ++c) {
-                            // auto fInd = facesGlobalIndicies(C, c);
-                            // if (numbOfMaterials(C) == 3) logger.buf << "MMC #" << C << "." << c << ": faces global indicies {" << fInd << "}\n";
-                            // logger.log();
+                        else {
+                            if (m == 2 && nInt != 1)
+                                logger.buf << cellStr << ", 2 mat: numb of int faces = " << nInt << " != 1\n";
+                            if (m == 3 && nInt != 2)
+                                logger.buf << cellStr << ", 3 mat: numb of int faces = " << nInt << " != 2\n";
+                            if (m > 3)
+                                logger.buf << cellStr << ": numb of mat = " << m << " > 3\n";
+                            double surfArea1 = 0., surfArea2 = 0.;
+                            std::vector<AmanziGeometry::Point> n2;
+                            for (size_t f = 0; f < x.numbOfExtFaces(C); ++f) {
+                                surfArea2 += x.area(C, f);
+                                n2.push_back(x.normal(C, f));
+                            }
+                            for (size_t f = 0; f < nExt; ++f) {
+                                surfArea1 += area(C, f);
+                                auto F = parentFaceLocalIndex(C, f);
+                                auto n1 = normal(C, f);
+                                auto diff = AmanziGeometry::norm(n1 - n2[F]);
+                                if (!fpEqual_(diff, 0.))
+                                    logger.buf << cellStr << ": face #" << f << " normal diff = " << diff << ",\t" << n1 << " vs. " << n2[F] << '\n';
+                            }
+                            auto diff = std::fabs(surfArea1 - surfArea2);
+                            if (!fpEqual_(diff, 0.))
+                                logger.buf << cellStr << ": cell surf area diff = " << diff << ",\t" << surfArea1 << " vs. " << surfArea2 << '\n';
+                            auto v1 = 0.;
+                            auto v2 = x.volume(C, 0);
+                            for (size_t c = 0; c < m; ++c)
+                                v1 += volume(C, c);
+                            if (!fpEqual_(v1 - v2, 0.))
+                                logger.buf << cellStr << ": volume err = " << std::fabs(v1 - v2) << '\n';    
                         }
+                        if (logger.buf.tellp() != std::streampos(0)) logger.wrn();
                     }
                 logger.end();
             }
