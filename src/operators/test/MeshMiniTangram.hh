@@ -213,8 +213,7 @@ namespace Amanzi {
                 return Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(g));
             }
             AmanziGeometry::Point normal(size_t C, size_t g) const final {
-                g = faceRenum_[C].at(g);
-                auto tmp = Tangram::polygon3d_normal(vertices_(C), polyCells_[C]->matface_vertices(g));
+                auto tmp = Tangram::polygon3d_normal(vertices_(C), polyCells_[C]->matface_vertices(faceRenum_[C].at(g)));
                 auto a = AmanziGeometry::Point(tmp[0], tmp[1], tmp[2]);
                 if (g >= numbOfExtFaces(C)) return a;
                 // correct normal dir for ext faces
