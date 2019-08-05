@@ -63,6 +63,16 @@ bool operator==(Tangram::Vector3 const & u, Tangram::Vector3 const & v) {
 bool operator!=(Tangram::Vector3 const & u, Tangram::Vector3 const & v) {
     return !(u == v); 
 }
+template<size_t N>
+std::istream& operator>>(std::istream& inp, std::array<double, N>& vec) {
+    for (size_t i = 0; i < N; ++i) inp >> vec[i];
+    return inp;
+}
+template<size_t N>
+std::ostream& operator<<(std::ostream& out, std::array<double, N> const & vec) {
+    for (size_t i = 0; i < N; ++i) out << vec[i] << ' ';
+    return out;
+}
 
 TEST(OPERATOR_DIFFUSION_ASC) {
     using namespace Teuchos;
@@ -97,8 +107,12 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 if (noise < 0.) noise = 0.;
                 if (noise > 1.) noise = 1.;
             logger.end();
-            auto solnIndex = logger.opt("choose soln", { "p = 1", "p = x + 2y + 3z + 4", "x" });
-            logger.beg("set coefs");
+            std::array<double, 4> solnCoefs;
+            logger.inp(
+                "set coefs { a, b, c, d } for exact solutio p(x, y, z) = a x + b y + c z + d in mat1 region",
+                solnCoefs
+            );
+            logger.beg("set eqn coefs");
                 double k, c;
                 logger.inp("set diffusion coef", k);
                 logger.inp("set reaction coef", c);
@@ -198,23 +212,11 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.beg("set exact soln");
             DiffusionReactionEqn eqn;
             eqn.c = c;
-            if (solnIndex == 0) {
-                eqn.p = [](Node const &, double) { return 1.; };
-                eqn.pGrad = [](Node const &, double) { return Node(0., 0., 0.); };
-                auto const pHess = constTensor(0.);
-                eqn.pHess = [=](Node const &, double) { return pHess; };
-            } else if (solnIndex == 1) {
-                eqn.p = [](Node const & x, double) { return x[0] + 2. * x[1] + 3. * x[2] + 4.; };
-                eqn.pGrad = [](Node const &, double) { return Node(1., 2., 3.); };
-                auto const pHess = constTensor(0.);
-                eqn.pHess = [=](Node const &, double) { return pHess; };
-            }
-            else {
-                eqn.p = [](Node const & x, double) { return x[0]; };
-                eqn.pGrad = [](Node const &, double) { return Node(1., 0., 0.); };
-                auto const pHess = constTensor(0.);
-                eqn.pHess = [=](Node const &, double) { return pHess; };
-            }
+            Node ABC(solnCoefs[0], solnCoefs[1], solnCoefs[2]);
+            eqn.p = [=](Node const & x, double) { return ABC * x + solnCoefs[3]; };
+            eqn.pGrad = [=](Node const &, double) { return ABC; };
+            auto const pHess = constTensor(0.);
+            eqn.pHess = [=](Node const &, double) { return pHess; };
             eqn.K = constTensor(k);
             PDE_DiffusionMFD_ASC::BC bc;
             bc.type = PDE_DiffusionMFD_ASC::BCType::Dirichlet;
