@@ -56,12 +56,15 @@ namespace Amanzi {
                 auto gamma = (u ^ w) * n / (n * n);
                 auto beta  = (w ^ v) * n / (n * n);
                 auto alpha = 1. - gamma - beta;
-                return 0. <= alpha && alpha <= 1. &&
-                       0. <= beta  && beta  <= 1. &&
-                       0. <= gamma && gamma <= 1.;
+                return fpInRange_(alpha, 0., 1.) &&
+                       fpInRange_(beta,  0., 1.) &&
+                       fpInRange_(gamma, 0., 1.);
             }
             bool fpEqual_(double a, double b, double tol = 1e-6) const {
-                    return std::fabs(a - b) < tol;
+                return std::fabs(a - b) < tol;
+            }
+            bool fpInRange_(double val, double a, double b, double tol = 1e-6) const {
+                return a - tol <= val && val <= b + tol;
             }
             int sgn_(double val) const {
                 return (0. < val) - (val < 0.);
