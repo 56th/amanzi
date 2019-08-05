@@ -66,9 +66,6 @@ namespace Amanzi {
             bool fpInRange_(double val, double a, double b, double tol = 1e-6) const {
                 return a - tol <= val && val <= b + tol;
             }
-            int sgn_(double val) const {
-                return (0. < val) - (val < 0.);
-            }
         public:
             MeshMiniTangram(
                 Teuchos::RCP<const Mesh> const & mesh, 

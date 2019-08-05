@@ -105,19 +105,21 @@ namespace Amanzi {
                     logger.pro(c + 1, ncells_owned);
                     auto localSystem = assembleLocalSystem_(c);
                     backSubstLocalMatrices_[c] = computeBackSubstLocalMatrices_(localSystem);
-                    // logger.buf 
-                    //     << "inverse mass mtx, W:\n"                       << localSystem.W << '\n'
-                    //     << "divergence mtx, -B:\n"                        << localSystem.mB << '\n'
-                    //     << "pressure mass mtx, \\Sigma:\n"                << localSystem.Sigma << '\n'
-                    //     << "concentration \"interpolation\" matrix, E:\n" << localSystem.E << '\n'
-                    //     << "- concentration mass matrix, C:\n"            << localSystem.C << '\n'
-                    //     << "interpolation mtx, R:\n"                      << localSystem.R << '\n';
-                    // logger.log();
-                    // logger.buf 
-                    //     << "EC:\n"                     << backSubstLocalMatrices_[c].EC << '\n'
-                    //     << "BW:\n"                     << backSubstLocalMatrices_[c].BW << '\n'
-                    //     << "(BWB^T + \\Sigma)^{-1}:\n" << backSubstLocalMatrices_[c].BWBt_plus_cSigma_inv << '\n';
-                    // logger.log();
+                    // if (meshMini_->numbOfMaterials(c) > 1) {
+                    //     logger.buf 
+                    //         << "inverse mass mtx, W:\n"                       << localSystem.W << '\n'
+                    //         << "divergence mtx, -B:\n"                        << localSystem.mB << '\n'
+                    //         << "pressure mass mtx, \\Sigma:\n"                << localSystem.Sigma << '\n'
+                    //         << "concentration \"interpolation\" matrix, E:\n" << localSystem.E << '\n'
+                    //         << "- concentration mass matrix, C:\n"            << localSystem.C << '\n'
+                    //         << "interpolation mtx, R:\n"                      << localSystem.R << '\n';
+                    //     logger.log();
+                    //     logger.buf 
+                    //         << "EC:\n"                     << backSubstLocalMatrices_[c].EC << '\n'
+                    //         << "BW:\n"                     << backSubstLocalMatrices_[c].BW << '\n'
+                    //         << "(BWB^T + \\Sigma)^{-1}:\n" << backSubstLocalMatrices_[c].BWBt_plus_cSigma_inv << '\n';
+                    //     logger.log();
+                    // }
                     auto& W = backSubstLocalMatrices_[c].W;
                     auto& BW = backSubstLocalMatrices_[c].BW;
                     auto& BWBt_plus_cSigma_inv = backSubstLocalMatrices_[c].BWBt_plus_cSigma_inv;
@@ -203,7 +205,7 @@ namespace Amanzi {
                 res.Sigma(m, m) = meshMini_->volume(c, m);
                 // div matrix
                 for (auto j : ind)
-                    res.mB(m, j) += meshMini_->area(c, j);
+                    res.mB(m, j) += meshMini_->normalSign(c, m, j) * meshMini_->area(c, j);
                 // inverse mass matrix
                 WhetStone::DenseMatrix locW;
                 std::vector<Node> fc(n), fn(n);
@@ -211,7 +213,7 @@ namespace Amanzi {
                 for (size_t i = 0; i < n; ++i) {
                     auto f = ind[i];
                     fc[i] = meshMini_->faceCentroid(c, f);
-                    fn[i] = meshMini_->normal(c, f); // sign!
+                    fn[i] = meshMini_->normal(c, f);
                     fn[i] /= AmanziGeometry::norm(fn[i]);
                     fa[i] = meshMini_->area(c, f);
                 }

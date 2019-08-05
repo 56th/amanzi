@@ -14,6 +14,9 @@ namespace Amanzi {
         class MeshMini {
         protected:
             Teuchos::RCP<const Mesh> mesh_;
+            int sgn_(double val) const {
+                return (0. < val) - (val < 0.);
+            }
         public:
             MeshMini(Teuchos::RCP<const Mesh> const & mesh) : mesh_(mesh) {}
             virtual ~MeshMini() = default;
@@ -43,6 +46,18 @@ namespace Amanzi {
             virtual AmanziGeometry::Point faceCentroid(size_t C, size_t g) const = 0;
             virtual double area(size_t C, size_t g) const = 0;
             virtual AmanziGeometry::Point normal(size_t C, size_t g) const = 0;
+            // +1 if outwards, -1 if inwards
+            int normalSign(size_t C, size_t c, size_t g) const {
+                auto n = normal(C, g);
+                auto u = centroid(C, c) - faceCentroid(C, g);
+                auto s = -sgn_(n * u);
+                if (s == 0) {
+                    std::stringstream err;
+                    err << __func__ << ": cell #" << C << ": mini-face #" << g << " has invalid normal (maybe the cell is not convex)";
+                    throw std::invalid_argument(err.str());
+                }
+                return s;
+            }
             virtual size_t parentFaceLocalIndex(size_t C, size_t g) const = 0;
             Entity_ID_List childrenFacesGlobalIndicies(size_t C, size_t F) const {
                 Entity_ID_List res;
