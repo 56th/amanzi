@@ -73,7 +73,7 @@ namespace Amanzi {
             MeshMiniTangram(
                 Teuchos::RCP<const Mesh> const & mesh, 
                 std::vector<std::shared_ptr<Tangram::CellMatPoly<3>>> const & polyCells,
-                bool deleteEmptyFaces = false, bool check = false
+                double deleteEmptyFacesTol = -1., bool check = false
             ) 
             : MeshMini(mesh)
             , polyCells_(polyCells) {
@@ -93,17 +93,16 @@ namespace Amanzi {
                         cellStr += " #" + std::to_string(C);
                         // remove empty tangram faces
                         std::unordered_set<size_t> deletedFaces;
-                        if (deleteEmptyFaces)
-                            for (size_t c = 0; c < m; ++c) {
-                                auto& ind = const_cast<std::vector<int>&>(polyCells_[C]->matpoly_faces(c));
-                                for (auto it = ind.begin(); it != ind.end(); ++it) {
-                                    auto area = Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(*it));
-                                    if (fpEqual_(area, 0.)) {
-                                        deletedFaces.insert(*it);
-                                        ind.erase(it);
-                                    }
+                        for (size_t c = 0; c < m; ++c) {
+                            auto& ind = const_cast<std::vector<int>&>(polyCells_[C]->matpoly_faces(c));
+                            for (auto it = ind.begin(); it != ind.end(); ++it) {
+                                auto area = Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(*it));
+                                if (fpEqual_(area, 0., deleteEmptyFacesTol)) {
+                                    deletedFaces.insert(*it);
+                                    ind.erase(it);
                                 }
                             }
+                        }
                         if (deletedFaces.size()) {
                             logger.buf << cellStr << ": deleted (empty) mini-faces = { ";
                             for (auto const & f : deletedFaces)

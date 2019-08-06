@@ -118,7 +118,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 logger.inp("set reaction coef", c);
             logger.end();
             auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
-            auto deleteEmptyFaces = logger.yes("delete empty mini-faces");
+            double deleteEmptyFacesTol;
+            logger.inp("delete empty mini-faces area tol (put -1. for no deletion)", deleteEmptyFacesTol);
             auto meshMiniIndex = logger.opt("mini-mesh type", { "empty", "tangram" });
             if (n1 != n2 && meshMiniIndex == 1)
                 logger.wrn("tangram does not divede T-junction face into two subface; this case currently is not handled by ASC");
@@ -211,7 +212,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.beg("set up mini-mesh");
             Teuchos::RCP<const MeshMini> meshMini;
             if (meshMiniIndex == 0) meshMini = Teuchos::rcp(new MeshMiniEmpty(mesh));
-            else meshMini = Teuchos::rcp(new MeshMiniTangram(mesh, cellmatpoly_list, deleteEmptyFaces, meshMiniCheck));
+            else meshMini = Teuchos::rcp(new MeshMiniTangram(mesh, cellmatpoly_list, deleteEmptyFacesTol, meshMiniCheck));
         logger.end();
         logger.beg("set exact soln");
             DiffusionReactionEqn eqn;
