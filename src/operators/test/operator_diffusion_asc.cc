@@ -13,6 +13,7 @@
 #include "Teuchos_RCP.hpp"
 #include "Teuchos_ParameterList.hpp"
 #include "Teuchos_ParameterXMLFileReader.hpp"
+#include "Teuchos_XMLParameterListWriter.hpp"
 #include "UnitTest++.h"
 
 // amanzi
@@ -41,7 +42,7 @@
 
 // output
 #include "exodusII.h" 
-#include "OutputXDMF.hh"
+// #include "OutputXDMF.hh"
 
 Tensor constTensor(double c) {
     Tensor K(3, 2);
@@ -130,12 +131,13 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.beg("load mesh");
             std::string xmlFileName = "test/operator_diffusion_asc.xml";
             logger.log(xmlFileName);
-            ParameterXMLFileReader xmlreader(xmlFileName);
-            auto plist = xmlreader.getParameters();
+            Teuchos::ParameterXMLFileReader xmlReader(xmlFileName);
+            auto plist = xmlReader.getParameters();
             plist.get<Teuchos::ParameterList>("io").set<std::string>("file name base", plist.get<Teuchos::ParameterList>("io").get<std::string>("file name base") + '/' +  meshName);
             auto ioNameBase = plist.get<Teuchos::ParameterList>("io").get<std::string>("file name base", "amanzi_vis");
-            auto ioNameBaseEXO = ioNameBase + "_mof.exo";
-            auto ioNameBaseGMV = ioNameBase + "_gmv.exo";
+            auto ioNameBaseEXO = ioNameBase + "_out.exo";
+            auto ioNameBaseGMV = ioNameBase + "_out.gmv";
+            auto ioNameBaseXML = ioNameBase + "_out.xml";
             auto region_list = plist.get<Teuchos::ParameterList>("regions");
             Teuchos::RCP<GeometricModel> gm = Teuchos::rcp(new GeometricModel(3, region_list, *comm));
             MeshFactory meshfactory(comm, gm);
@@ -213,7 +215,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             if (exportWhat == 0 || exportWhat == 1) {
                 logger.beg("export tangram poly-cells to .gmv and convert to .exo");
                     // write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_mof.gmv");
-                    write_to_gmv(cellmatpoly_list, ioNameBase + "_mof.gmv");
+                    write_to_gmv(cellmatpoly_list, ioNameBaseGMV);
                     #ifdef MESHCONVERT
                         std::string meshconvert = MESHCONVERT;
                         auto code = system((
@@ -338,10 +340,12 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             // }    
             // logger.buf << "p_* - p_h:\n" << pCellDiff;
             // logger.log();
-            double l2 = 0., vol = 0., pCellMean = 0., pCellExactMean = 0.;
+            double l2 = 0., lInf = 0., vol = 0., pCellMean = 0., pCellExactMean = 0.;
             for (size_t C = 0; C < numbOfCells; ++C) 
                 for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c) {
-                    l2 += pow(pCellExact[c][C] - pCell[c][C], 2.) * meshMini->volume(C, c);
+                    auto diff = pCellExact[c][C] - pCell[c][C];
+                    l2 += pow(diff, 2.) * meshMini->volume(C, c);
+                    lInf = std::max(lInf, diff);
                     vol += meshMini->volume(C, c);
                     pCellMean += pCell[c][C] * meshMini->volume(C, c);
                     pCellExactMean += pCellExact[c][C] * meshMini->volume(C, c);
@@ -349,14 +353,27 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             pCellMean /= vol;
             pCellExactMean /= vol;
             l2 = sqrt(l2);
-            logger.buf << "cell l2 err: " << l2 << '\n' 
-                       << "volume:      " << vol << '\n'
-                       << "p_h mean:    " << pCellMean << '\n'
-                       << "p_* mean:    " << pCellExactMean << '\n';
+            logger.buf 
+                << "flux residual: " << fluxRes << '\n'
+                << "cell l2   err: " << l2 << '\n' 
+                << "cell lInf err: " << lInf << '\n' 
+                << "volume:        " << vol << '\n'
+                << "p_h mean:      " << pCellMean << '\n'
+                << "p_* mean:      " << pCellExactMean << '\n';
             logger.log();
         logger.end();
+        logger.beg("export soln errors and other stats to " + ioNameBaseXML);
+            Teuchos::ParameterList plistOut;
+            plistOut.set("flux residual", fluxRes);
+            plistOut.set("cell l2 err", l2);
+            plistOut.set("cell lInf err", lInf);
+            plistOut.set("p_h mean", pCellMean);
+            plistOut.set("p_* mean", pCellExactMean);
+            Teuchos::XMLParameterListWriter xmlWriter;
+            std::ofstream(ioNameBaseXML) << xmlWriter.toXML(plistOut);
+        logger.end();
         if (exportWhat == 1) {
-            logger.beg("export .exo to test/io/");
+            logger.beg("export solution to " + ioNameBaseEXO);
                 char const * exPath = ioNameBaseEXO.c_str();
                 int exCPUWordSize = sizeof(double), exIOWordSize = 0, exErr; 
                 float exVersion;
