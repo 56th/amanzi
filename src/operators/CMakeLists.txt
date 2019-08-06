@@ -32,6 +32,7 @@ project(OPERATORS)
 include_directories(${Teuchos_INCLUDE_DIRS})
 include_directories(${Epetra_INCLUDE_DIRS})
 include_directories(${Trilinos_INCLUDE_DIRS})
+include_directories(${SEACAS_INCLUDE_DIR}) # for exodusII.h output
 
 # Amanzi include directories
 include_directories(${ATK_SOURCE_DIR})

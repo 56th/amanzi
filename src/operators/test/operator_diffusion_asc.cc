@@ -15,15 +15,15 @@
 #include "Teuchos_ParameterXMLFileReader.hpp"
 #include "UnitTest++.h"
 
-// Amanzi
+// amanzi
 #include "MeshFactory.hh"
 #include "GMVMesh.hh"
 #include "LinearOperatorFactory.hh"
-// #include "mfd3d_diffusion.hh"
-// #include "tensor.hh"
 
-// Operators
+// operators
 #include "OperatorDefs.hh"
+#include "PDE_DiffusionMFD_ASC.hh"
+#include "DiffusionReactionEqn.hh"
 
 // fancy colors for cout logging 
 #include "SingletonLogger.hpp"
@@ -39,8 +39,8 @@
 #include "MeshMiniEmpty.hh"
 #include "MeshMiniTangram.hh"
 
-#include "PDE_DiffusionMFD_ASC.hh"
-#include "DiffusionReactionEqn.hh"
+// output
+#include "exodusII.h" 
 #include "OutputXDMF.hh"
 
 Tensor constTensor(double c) {
@@ -134,6 +134,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             auto plist = xmlreader.getParameters();
             plist.get<Teuchos::ParameterList>("io").set<std::string>("file name base", plist.get<Teuchos::ParameterList>("io").get<std::string>("file name base") + '/' +  meshName);
             auto ioNameBase = plist.get<Teuchos::ParameterList>("io").get<std::string>("file name base", "amanzi_vis");
+            auto ioNameBaseEXO = ioNameBase + "_mof.exo";
+            auto ioNameBaseGMV = ioNameBase + "_gmv.exo";
             auto region_list = plist.get<Teuchos::ParameterList>("regions");
             Teuchos::RCP<GeometricModel> gm = Teuchos::rcp(new GeometricModel(3, region_list, *comm));
             MeshFactory meshfactory(comm, gm);
@@ -208,6 +210,18 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                         throw std::logic_error("cellmatpoly_list.size() != numbOfCells");
                 logger.end();
             logger.end();
+            if (exportWhat == 0 || exportWhat == 1) {
+                logger.beg("export tangram poly-cells to .gmv and convert to .exo");
+                    // write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_mof.gmv");
+                    write_to_gmv(cellmatpoly_list, ioNameBase + "_mof.gmv");
+                    #ifdef MESHCONVERT
+                        std::string meshconvert = MESHCONVERT;
+                        auto code = system((
+                            meshconvert + ' ' + ioNameBaseGMV + ' ' + ioNameBaseEXO + " ; rm " + ioNameBaseGMV
+                        ).c_str()); 
+                    #endif
+                logger.end();
+            }
         logger.end();
         logger.beg("set up mini-mesh");
             Teuchos::RCP<const MeshMini> meshMini;
@@ -341,61 +355,66 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.log();
         logger.end();
         if (exportWhat == 1) {
-            logger.beg("export soln (test/io/*)");
-                logger.beg("export tangram poly-cells to .gmv and convert to .exo w/o cell renumbering");
-                    for (auto& cmp : cellmatpoly_list) // we need it so meshconvert does not renumber cells
-                        for (auto& id : const_cast<std::vector<int>&>(cmp->matpoly_matids()))
-                            id = 0;
-                    for (auto& id : cell_mat_ids) id = 0;
-                    write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_flat.gmv");
-                    // write_to_gmv(cellmatpoly_list, ioNameBase + "_flat.gmv");
-                    int code;
-                    #ifdef MESHCONVERT
-                        std::string meshconvert = MESHCONVERT;
-                        code = system((
-                            meshconvert + ' ' + ioNameBase + "_flat.gmv " + ioNameBase + "_flat.exo ; rm " + ioNameBase + "_flat.gmv"
-                            // meshconvert + ' ' + ioNameBase + "_flat.gmv " + ioNameBase + "_flat.exo"
-                        ).c_str()); 
-                    #endif
-                logger.end();
-                logger.beg("import .exo mesh to amanzi and flatten soln vectors");
-                    auto meshFlattened = meshfactory.create(ioNameBase + "_flat.exo", true, false);
-                    code = system(("rm " + ioNameBase + "_flat.exo").c_str()); 
-                    auto numbOfCellsFlattened = meshFlattened->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
-                    auto numbOfFacesFlattened = meshFlattened->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::OWNED);
-                    logger.buf 
-                        << "numb of cells: " << numbOfCellsFlattened << '\n'
-                        << "numb of faces: " << numbOfFacesFlattened;
-                    logger.log();
-                    CompositeVectorSpace cvsFlattenedP;
-                    cvsFlattenedP.SetMesh(meshFlattened)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, 1);
-                    auto  pFlattened = CompositeVector(cvsFlattenedP);
-                    auto& pCellFlattened = *pFlattened.ViewComponent("cell", true);
-                    auto pCellExactFlattened = pCellFlattened;
-                    size_t i = 0;
-                    for (size_t C = 0; C < numbOfCells; ++C) 
-                        for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c, ++i) {
-                            pCellFlattened[0][i] = pCell[c][C];
-                            pCellExactFlattened[0][i] = pCellExact[c][C];
-                        }
-                    logger.buf << "flattened # of pressure d.o.f. = " << i;
-                    logger.log();
-                logger.end();
-                logger.beg("export to .hdf5");
-                    Amanzi::OutputXDMF io(plist.get<Teuchos::ParameterList>("io"), meshFlattened, true, false);
-                    io.InitializeCycle(0., 0);
-                    io.WriteVector(*pCellFlattened(0), "p_h", AmanziMesh::CELL);
-                    io.WriteVector(*pCellExactFlattened(0), "p_*", AmanziMesh::CELL);
-                    io.FinalizeCycle();
-                logger.end();
-                // Amanzi::OutputXDMF io(plist.get<Teuchos::ParameterList>("io"), mesh, true, false);
-                // io.InitializeCycle(0., 0);
-                // io.WriteVector(*pCell(0), "p_h", AmanziMesh::CELL);
-                // // for (size_t c = 0; c < numbOfCells; ++c) pCellExact[1][c] = c;
-                // // io.WriteMultiVector(pCellExact, { "p_*", "cell_numeration" });
-                // io.WriteVector(*pCellExact(0), "p_*", AmanziMesh::CELL);
-                // io.FinalizeCycle();
+            logger.beg("export .exo to test/io/");
+                char const * exPath = ioNameBaseEXO.c_str();
+                int exCPUWordSize = sizeof(double), exIOWordSize = 0, exErr; 
+                float exVersion;
+                auto exID = ex_open(exPath, EX_WRITE, &exCPUWordSize, &exIOWordSize, &exVersion);
+                if (exID >= 0) {
+                    // ...
+                    exErr = ex_close(exID);
+                    if (exErr != 0)
+                        logger.wrn("error closing .exo file");
+                } else logger.wrn("error opening .exo file");
             logger.end();
+            // logger.beg("export soln (test/io/*)");
+            //     logger.beg("export tangram poly-cells to .gmv and convert to .exo w/o cell renumbering");
+            //         for (auto& cmp : cellmatpoly_list) // we need it so meshconvert does not renumber cells
+            //             for (auto& id : const_cast<std::vector<int>&>(cmp->matpoly_matids()))
+            //                 id = 0;
+            //         for (auto& id : cell_mat_ids) id = 0;
+            //         write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_flat.gmv");
+            //         // write_to_gmv(cellmatpoly_list, ioNameBase + "_flat.gmv");
+            //         int code;
+            //         #ifdef MESHCONVERT
+            //             std::string meshconvert = MESHCONVERT;
+            //             code = system((
+            //                 meshconvert + ' ' + ioNameBase + "_flat.gmv " + ioNameBase + "_flat.exo ; rm " + ioNameBase + "_flat.gmv"
+            //                 // meshconvert + ' ' + ioNameBase + "_flat.gmv " + ioNameBase + "_flat.exo"
+            //             ).c_str()); 
+            //         #endif
+            //     logger.end();
+            //     logger.beg("import .exo mesh to amanzi and flatten soln vectors");
+            //         auto meshFlattened = meshfactory.create(ioNameBase + "_flat.exo", true, false);
+            //         code = system(("rm " + ioNameBase + "_flat.exo").c_str()); 
+            //         auto numbOfCellsFlattened = meshFlattened->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
+            //         auto numbOfFacesFlattened = meshFlattened->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::OWNED);
+            //         logger.buf 
+            //             << "numb of cells: " << numbOfCellsFlattened << '\n'
+            //             << "numb of faces: " << numbOfFacesFlattened;
+            //         logger.log();
+            //         CompositeVectorSpace cvsFlattenedP;
+            //         cvsFlattenedP.SetMesh(meshFlattened)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, 1);
+            //         auto  pFlattened = CompositeVector(cvsFlattenedP);
+            //         auto& pCellFlattened = *pFlattened.ViewComponent("cell", true);
+            //         auto pCellExactFlattened = pCellFlattened;
+            //         size_t i = 0;
+            //         for (size_t C = 0; C < numbOfCells; ++C) 
+            //             for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c, ++i) {
+            //                 pCellFlattened[0][i] = pCell[c][C];
+            //                 pCellExactFlattened[0][i] = pCellExact[c][C];
+            //             }
+            //         logger.buf << "flattened # of pressure d.o.f. = " << i;
+            //         logger.log();
+            //     logger.end();
+            //     logger.beg("export to .hdf5");
+            //         Amanzi::OutputXDMF io(plist.get<Teuchos::ParameterList>("io"), meshFlattened, true, false);
+            //         io.InitializeCycle(0., 0);
+            //         io.WriteVector(*pCellFlattened(0), "p_h", AmanziMesh::CELL);
+            //         io.WriteVector(*pCellExactFlattened(0), "p_*", AmanziMesh::CELL);
+            //         io.FinalizeCycle();
+            //     logger.end();
+            // logger.end();
         }
     } catch (std::exception const & e) {
         logger.err(e.what());
