@@ -243,7 +243,7 @@ namespace Amanzi {
             res.R = localSystem.R;
             return res;
         }
-        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::recoverSolution(CompositeVector& P, CompositeVector& U) {
+        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::recoverSolution(CompositeVector& P, CompositeVector& U, double* fluxRes = nullptr) {
             auto& logger = SingletonLogger::instance();
             auto& p      = *P.ViewComponent("cell", true);
             auto& lambda = *P.ViewComponent("face", true); 
@@ -280,9 +280,7 @@ namespace Amanzi {
                     }
                 }
             }
-            l2 = sqrt(l2);
-            logger.buf << "recovered flux residual: " << l2;
-            logger.log();
+            if (fluxRes != nullptr) *fluxRes = sqrt(l2);
             return *this;
         }
         PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::computeExactConcentrations(Epetra_MultiVector& res, ScalarFunc const & p, double t = 0.) {

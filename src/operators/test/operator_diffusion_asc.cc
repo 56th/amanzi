@@ -308,7 +308,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         } else 
             pFace = pFaceExact;
         logger.beg("recover cell pressure vals and fluxes");
-            op.recoverSolution(p, u);
+            double fluxRes;
+            op.recoverSolution(p, u, &fluxRes);
             // logger.buf << "pressure concentration / cell computed solution:\n" << pFace << pCell;
             // logger.log();
             // logger.buf << "pressure cell exact solution:\n" << pCellExact;
