@@ -8,6 +8,7 @@
 #define AMANZI_MESH_MINI_TANGRAM_HH_
 
 #include <unordered_map>
+#include <unordered_set>
 #include "MeshMini.hh"
 #include "MeshMiniEmpty.hh"
 #include "tangram/driver/CellMatPoly.h"
@@ -72,7 +73,7 @@ namespace Amanzi {
             MeshMiniTangram(
                 Teuchos::RCP<const Mesh> const & mesh, 
                 std::vector<std::shared_ptr<Tangram::CellMatPoly<3>>> const & polyCells,
-                bool check = false
+                bool deleteEmptyFaces = false, bool check = false
             ) 
             : MeshMini(mesh)
             , polyCells_(polyCells) {
@@ -90,11 +91,41 @@ namespace Amanzi {
                         auto m = numbOfMaterials(C);
                         std::string cellStr = m > 1 ? "MMC" : "SMC";
                         cellStr += " #" + std::to_string(C);
+                        // remove empty tangram faces
+                        std::unordered_set<size_t> deletedFaces;
+                        if (deleteEmptyFaces)
+                            for (size_t c = 0; c < m; ++c) {
+                                auto& ind = const_cast<std::vector<int>&>(polyCells_[C]->matpoly_faces(c));
+                                for (auto it = ind.begin(); it != ind.end(); ++it) {
+                                    auto area = Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(*it));
+                                    if (fpEqual_(area, 0.)) {
+                                        deletedFaces.insert(*it);
+                                        ind.erase(it);
+                                    }
+                                }
+                            }
+                        if (deletedFaces.size()) {
+                            logger.buf << cellStr << ": deleted (empty) mini-faces = { ";
+                            for (auto const & f : deletedFaces)
+                                logger.buf << f << ' ';
+                            logger.buf << "}\n";
+                            // for (size_t c = 0; c < m; ++c) {
+                            //     logger.buf << "new mini-faces = { ";
+                            //     for (auto const & f : polyCells_[C]->matpoly_faces(c))
+                            //         logger.buf << f << ' ';
+                            //     logger.buf << "}\n";
+                            // }
+                        }
+                        auto numMatfaces = polyCells_[C]->num_matfaces();
                         // build mini-face to macro-face (child to parent) map
-                        for (size_t i = 0; i < polyCells_[C]->num_matfaces(); ++i) 
+                        for (size_t i = 0; i < numMatfaces; ++i) 
                             faceRenum_[C][i] = i; // no renum initially
-                        parentFaceLocalIndicies_[C].resize(polyCells_[C]->num_matfaces());
-                        for (size_t g = 0; g < parentFaceLocalIndicies_[C].size(); ++g) {
+                        parentFaceLocalIndicies_[C].resize(numMatfaces);
+                        for (size_t g = 0; g < numMatfaces; ++g) {
+                            if (deletedFaces.find(g) != deletedFaces.end()) {
+                                parentFaceLocalIndicies_[C][g] = -2; // deleted face
+                                continue;
+                            }
                             auto p = faceCentroid(C, g);
                             std::vector<AmanziGeometry::Point> coords;
                             auto ind = macroFacesIndicies(C);
@@ -136,10 +167,8 @@ namespace Amanzi {
                         size_t nInt = 0;
                         for (auto const & kvp : gluedIntFaces_[C])
                             nInt += kvp.first == kvp.second;
-                        if (nInt != fInt.size()) {
+                        if (nInt != fInt.size())
                             logger.buf << cellStr << ": numb of int faces = " << fInt.size() << " -> " << nInt;
-                            logger.log();
-                        }
                         if (m > 1) { // renumber faces
                             std::multimap<int, size_t, std::greater<int>> F2f; // sorted
                             for (size_t i = 0; i < parentFaceLocalIndicies_[C].size(); ++i)
@@ -150,8 +179,9 @@ namespace Amanzi {
                         }
                         for (auto const & kvp : faceRenum_[C])
                             faceRenumInv_[C][kvp.second] = kvp.first;
-                        numbOfExtFaces_[C] = polyCells_[C]->num_matfaces() - fInt.size();
+                        numbOfExtFaces_[C] = numMatfaces - fInt.size() - deletedFaces.size();
                         numbOfFaces_[C] = numbOfExtFaces_[C] + nInt;
+                        if (logger.buf.tellp() != std::streampos(0)) logger.log();
                     }
                 logger.end();
                 if (!check) return;
@@ -277,6 +307,8 @@ namespace Amanzi {
                 for (auto& i : a) {
                     i = gluedIntFaces_[C].find(i) != gluedIntFaces_[C].end() ? gluedIntFaces_[C].at(i) : i;
                     i = faceRenumInv_[C].at(i);
+                    if (parentFaceLocalIndex(C, i) == -2)
+                        throw std::logic_error("deleted faces shall not be used");
                 }
                 return a;
             }    

@@ -118,6 +118,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 logger.inp("set reaction coef", c);
             logger.end();
             auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
+            auto deleteEmptyFaces = logger.yes("delete empty mini-faces");
             auto meshMiniIndex = logger.opt("mini-mesh type", { "empty", "tangram" });
             if (n1 != n2 && meshMiniIndex == 1)
                 logger.wrn("tangram does not divede T-junction face into two subface; this case currently is not handled by ASC");
@@ -207,7 +208,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.beg("set up mini-mesh");
             Teuchos::RCP<const MeshMini> meshMini;
             if (meshMiniIndex == 0) meshMini = Teuchos::rcp(new MeshMiniEmpty(mesh));
-            else meshMini = Teuchos::rcp(new MeshMiniTangram(mesh, cellmatpoly_list, meshMiniCheck));
+            else meshMini = Teuchos::rcp(new MeshMiniTangram(mesh, cellmatpoly_list, deleteEmptyFaces, meshMiniCheck));
         logger.end();
         logger.beg("set exact soln");
             DiffusionReactionEqn eqn;
@@ -337,7 +338,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.end();
         if (exportWhat == 0 || exportWhat == 1) {
             logger.beg("export tangram poly-cells to .gmv and convert to .exo");
-                write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_mof.gmv");
+                // write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_mof.gmv");
+                write_to_gmv(cellmatpoly_list, ioNameBase + "_mof.gmv");
                 #ifdef MESHCONVERT
                     std::string meshconvert = MESHCONVERT;
                     auto code = system((
@@ -354,16 +356,18 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                             id = 0;
                     for (auto& id : cell_mat_ids) id = 0;
                     write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_flat.gmv");
+                    // write_to_gmv(cellmatpoly_list, ioNameBase + "_flat.gmv");
                     int code;
                     #ifdef MESHCONVERT
                         std::string meshconvert = MESHCONVERT;
                         code = system((
                             meshconvert + ' ' + ioNameBase + "_flat.gmv " + ioNameBase + "_flat.exo ; rm " + ioNameBase + "_flat.gmv"
+                            // meshconvert + ' ' + ioNameBase + "_flat.gmv " + ioNameBase + "_flat.exo"
                         ).c_str()); 
                     #endif
                 logger.end();
-                logger.beg("import .gmv mesh to amanzi and flatten soln vectors");
-                    auto meshFlattened = meshfactory.create(ioNameBase + "_flat.exo");
+                logger.beg("import .exo mesh to amanzi and flatten soln vectors");
+                    auto meshFlattened = meshfactory.create(ioNameBase + "_flat.exo", true, false);
                     code = system(("rm " + ioNameBase + "_flat.exo").c_str()); 
                     auto numbOfCellsFlattened = meshFlattened->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
                     auto numbOfFacesFlattened = meshFlattened->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::OWNED);
