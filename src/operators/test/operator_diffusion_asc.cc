@@ -336,18 +336,6 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                        << "p_* mean:    " << pCellExactMean << '\n';
             logger.log();
         logger.end();
-        if (exportWhat == 0 || exportWhat == 1) {
-            logger.beg("export tangram poly-cells to .gmv and convert to .exo");
-                // write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_mof.gmv");
-                write_to_gmv(cellmatpoly_list, ioNameBase + "_mof.gmv");
-                #ifdef MESHCONVERT
-                    std::string meshconvert = MESHCONVERT;
-                    auto code = system((
-                        meshconvert + ' ' + ioNameBase + "_mof.gmv " + ioNameBase + "_mof.exo ; rm " + ioNameBase + "_mof.gmv"
-                    ).c_str()); 
-                #endif
-            logger.end();
-        }
         if (exportWhat == 1) {
             logger.beg("export soln (test/io/*)");
                 logger.beg("export tangram poly-cells to .gmv and convert to .exo w/o cell renumbering");
