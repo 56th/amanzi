@@ -28,8 +28,10 @@ namespace Amanzi {
         private:
             std::vector<std::shared_ptr<Tangram::CellMatPoly<3>>> polyCells_;
             std::vector<std::unordered_map<size_t, size_t>> faceRenum_;
-            std::vector<size_t> numbOfExtFaces_;
-            std::vector<std::vector<size_t>> parentFaceLocalIndicies_;
+            std::vector<std::unordered_map<size_t, size_t>> faceRenumInv_;
+            std::vector<std::unordered_map<size_t, size_t>> gluedIntFaces_;
+            std::vector<size_t> numbOfFaces_, numbOfExtFaces_;
+            std::vector<std::vector<int>> parentFaceLocalIndicies_; // -1 for internal
             std::vector<Tangram::Point<3>> vertices_(size_t C) const {
                 std::vector<Tangram::Point<3>> pts;
                 auto nv = polyCells_[C]->num_matvertices();
@@ -77,37 +79,22 @@ namespace Amanzi {
                 auto& logger = SingletonLogger::instance();
                 auto n = mesh_->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
                 faceRenum_.resize(n);
+                faceRenumInv_.resize(n);
+                numbOfFaces_.resize(n);
                 numbOfExtFaces_.resize(n);
+                gluedIntFaces_.resize(n);
                 parentFaceLocalIndicies_.resize(n);
-                logger.beg("renumber mini-faces and build mini-face to macro-face (child to parent) map");
+                logger.beg("glue mini-faces if needed, renumber mini-faces, and build mini-face to macro-face (child to parent) map");
                     for (size_t C = 0; C < n; ++C) {
                         logger.pro(C + 1, n);
-                        std::string cellStr = numbOfMaterials(C) > 1 ? "MMC" : "SMC";
+                        auto m = numbOfMaterials(C);
+                        std::string cellStr = m > 1 ? "MMC" : "SMC";
                         cellStr += " #" + std::to_string(C);
-
-                        // logger.log(cellStr);
-
-                        std::unordered_map<size_t, size_t> freq;
-                        for (size_t c = 0; c < numbOfMaterials(C); ++c)
-                            for (auto const & i : polyCells_[C]->matpoly_faces(c)) ++freq[i];
-                        std::vector<size_t> fInt;
-                        for (auto const & f : freq) {
-                            faceRenum_[C][f.first] = f.first;
-                            if (f.second > 1) fInt.push_back(f.first);
-                        
-                            // logger.buf << f.first << " (" << f.second << "), ";
-                        
-                        }
-
-                        // logger.buf << '\n';
-                        // for (auto const & v : vertices_(C))
-                        //     logger.buf << "{ " << v << " }\n";
-                        // logger.log();
-                        
-                        for (size_t i = 0; i < fInt.size(); ++i) std::swap(faceRenum_[C][fInt[i]], faceRenum_[C][faceRenum_[C].size() - 1 - i]);
-                        numbOfExtFaces_[C] = polyCells_[C]->num_matfaces() - fInt.size();
-                        parentFaceLocalIndicies_[C].resize(numbOfExtFaces_[C]);
-                        for (size_t g = 0; g < numbOfExtFaces_[C]; ++g) {
+                        // build mini-face to macro-face (child to parent) map
+                        for (size_t i = 0; i < polyCells_[C]->num_matfaces(); ++i) 
+                            faceRenum_[C][i] = i; // no renum initially
+                        parentFaceLocalIndicies_[C].resize(polyCells_[C]->num_matfaces());
+                        for (size_t g = 0; g < parentFaceLocalIndicies_[C].size(); ++g) {
                             auto p = faceCentroid(C, g);
                             std::vector<AmanziGeometry::Point> coords;
                             auto ind = macroFacesIndicies(C);
@@ -123,15 +110,48 @@ namespace Amanzi {
                                         dist[j] = std::min(dist[j], std::fabs(n * (centroid - p)));
                             }
                             auto min = std::min_element(dist.begin(), dist.end());
-                            if (!fpEqual_(*min, 0.)) {
-                                logger.buf 
-                                    << __func__ << ": " << cellStr << ": mini-face #" << g << " centroid / macro-face distance is " << *min << '\n'
-                                    << "dist = { " << dist << " }\n"
-                                    << "numb of mini-faces = " << numbOfFaces(C) << ", numb of ext mini-faces = " << numbOfExtFaces(C);
-                                logger.wrn();
-                            }
-                            parentFaceLocalIndicies_[C][g] = std::distance(dist.begin(), min);
+                            parentFaceLocalIndicies_[C][g] = 
+                                fpEqual_(*min, 0.)
+                                ? std::distance(dist.begin(), min) // g is external
+                                : -1; // g is internal
                         }
+                        // glue internal faces if needed
+                        std::vector<size_t> fInt;
+                        for (size_t i = 0; i < parentFaceLocalIndicies_[C].size(); ++i)
+                            if (parentFaceLocalIndicies_[C][i] == -1)
+                                fInt.push_back(i);
+                        for (size_t i = 0; i < fInt.size(); ++i) {
+                            auto f1 = fInt[i];
+                            if (gluedIntFaces_[C].find(f1) == gluedIntFaces_[C].end()) {
+                                gluedIntFaces_[C][f1] = f1;
+                                auto p1 = faceCentroid(C, f1);
+                                for (size_t j = i + 1; j < fInt.size(); ++j) {
+                                    auto f2 = fInt[j];
+                                    auto p2 = faceCentroid(C, f2);
+                                    if (gluedIntFaces_[C].find(f2) == gluedIntFaces_[C].end() && AmanziGeometry::norm(p1 - p2) < 1e-6)
+                                        gluedIntFaces_[C][f2] = f1;
+                                }
+                            }
+                        }
+                        size_t nInt = 0;
+                        for (auto const & kvp : gluedIntFaces_[C])
+                            nInt += kvp.first == kvp.second;
+                        if (nInt != fInt.size()) {
+                            logger.buf << cellStr << ": numb of int faces = " << fInt.size() << " -> " << nInt;
+                            logger.log();
+                        }
+                        if (m > 1) { // renumber faces
+                            std::multimap<int, size_t, std::greater<int>> F2f; // sorted
+                            for (size_t i = 0; i < parentFaceLocalIndicies_[C].size(); ++i)
+                                F2f.insert(std::pair<int, size_t>(parentFaceLocalIndicies_[C][i], i));
+                            size_t i = 0;
+                            for (auto const & kvp : F2f) 
+                                faceRenum_[C][i++] = kvp.second;
+                        }
+                        for (auto const & kvp : faceRenum_[C])
+                            faceRenumInv_[C][kvp.second] = kvp.first;
+                        numbOfExtFaces_[C] = polyCells_[C]->num_matfaces() - fInt.size();
+                        numbOfFaces_[C] = numbOfExtFaces_[C] + nInt;
                     }
                 logger.end();
                 if (!check) return;
@@ -143,6 +163,20 @@ namespace Amanzi {
                         auto m = numbOfMaterials(C);
                         auto nExt = numbOfExtFaces(C);
                         auto nInt = numbOfFaces(C) - nExt;
+                        size_t i;
+                        bool ok = true;
+                        for (i = 0; i < nExt; ++i)
+                            if (parentFaceLocalIndex(C, i) == -1)
+                                ok = false;
+                        for (; i < nExt + nInt; ++i)
+                            if (parentFaceLocalIndex(C, i) != -1)
+                                ok = false;
+                        if (!ok) {
+                            logger.buf << cellStr << ": inconsistent numbering of int/ext mini-faces:\n";
+                            for (i = 0; i < nExt + nInt; ++i)
+                                logger.buf << parentFaceLocalIndex(C, i) << ' ';
+                            logger.buf << '\n';
+                        }
                         if (m == 1) {
                             if (nInt != 0)
                                 logger.buf << cellStr << ": numb of int faces = " << nInt << " != 0\n";
@@ -220,7 +254,7 @@ namespace Amanzi {
                 logger.end();
             }
             size_t numbOfFaces(size_t C) const final {
-                return polyCells_[C]->num_matfaces();
+                return numbOfFaces_[C];
             }
             size_t numbOfExtFaces(size_t C) const final {
                 return numbOfExtFaces_[C];
@@ -239,43 +273,37 @@ namespace Amanzi {
                 return polyCells_[C]->matpoly_volume(c);
             }
             Entity_ID_List facesGlobalIndicies(size_t C, size_t c) const final { 
-                auto a = polyCells_[C]->matpoly_faces(c);
-                for (auto& i : a) i = faceRenum_[C].at(i);
+                std::vector<int> a = polyCells_[C]->matpoly_faces(c);
+                for (auto& i : a) {
+                    i = gluedIntFaces_[C].find(i) != gluedIntFaces_[C].end() ? gluedIntFaces_[C].at(i) : i;
+                    i = faceRenumInv_[C].at(i);
+                }
                 return a;
             }    
             AmanziGeometry::Point faceCentroid(size_t C, size_t g) const final {
                 g = faceRenum_[C].at(g);
                 std::vector<double> a;
-                Tangram::polygon3d_moments(vertices_(C), polyCells_[C]->matface_vertices(g), a);
-                return AmanziGeometry::Point(a[1] / a[0], a[2] / a[0], a[3] / a[0]);
+                auto pts = vertices_(C);
+                auto vrt = polyCells_[C]->matface_vertices(g);
+                Tangram::polygon3d_moments(pts, vrt, a);
+                if (a[0] != 0.) return AmanziGeometry::Point(a[1] / a[0], a[2] / a[0], a[3] / a[0]);
+                return AmanziGeometry::Point(pts[vrt[0]][0], pts[vrt[0]][1], pts[vrt[0]][2]);
             }
             double area(size_t C, size_t g) const final {
                 g = faceRenum_[C].at(g);
                 return Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(g));
             }
             AmanziGeometry::Point normal(size_t C, size_t g) const final {
-                auto tmp = Tangram::polygon3d_normal(vertices_(C), polyCells_[C]->matface_vertices(faceRenum_[C].at(g)));
-                auto a = AmanziGeometry::Point(tmp[0], tmp[1], tmp[2]);
-                if (g >= numbOfExtFaces(C)) return a;
-                // correct normal dir for ext faces
                 auto i = parentFaceLocalIndex(C, g);
+                if (i == -1) { // int mini-face
+                    auto tmp = Tangram::polygon3d_normal(vertices_(C), polyCells_[C]->matface_vertices(faceRenum_[C].at(g)));
+                    return AmanziGeometry::Point(tmp[0], tmp[1], tmp[2]);
+                }
                 auto b = macroFacesNormalsDirs(C)[i] * mesh_->face_normal(macroFacesIndicies(C)[i]);
-                b /= AmanziGeometry::norm(b);
-                auto s = sgn_(a * b);
-                if (s == 0) {
-                    std::stringstream err;
-                    err << __func__ << ": cell #" << C << ": mini-face #" << g << " and its parent face have perp normals";
-                    throw std::invalid_argument(err.str());
-                }
-                return s * a;
+                return b / AmanziGeometry::norm(b);
             }
-            size_t parentFaceLocalIndex(size_t C, size_t g) const final {
-                if (g >= numbOfExtFaces(C)) {
-                    std::stringstream err;
-                    err << __func__ << ": cell #" << C << ": mini-face #" << g << " is not an external face";
-                    throw std::invalid_argument(err.str());
-                }
-                return parentFaceLocalIndicies_[C][g];
+            int parentFaceLocalIndex(size_t C, size_t g) const final {
+                return parentFaceLocalIndicies_[C][faceRenum_[C].at(g)];
             }
         };
     }

@@ -52,7 +52,7 @@ namespace Amanzi {
                 auto n = macroFacesNormalsDirs(C)[g] * mesh_->face_normal(macroFacesIndicies(C)[g]);
                 return n / AmanziGeometry::norm(n);
             }
-            size_t parentFaceLocalIndex(size_t C, size_t g) const final {
+            int parentFaceLocalIndex(size_t C, size_t g) const final {
                 return g;
             }
         };

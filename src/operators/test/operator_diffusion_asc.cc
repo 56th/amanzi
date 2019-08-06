@@ -109,7 +109,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.end();
             std::array<double, 4> solnCoefs;
             logger.inp(
-                "set coefs { a, b, c, d } for exact solutio p(x, y, z) = a x + b y + c z + d in mat1 region",
+                "set coefs { a, b, c, d } for exact solution p(x, y, z) = a x + b y + c z + d in mat1 region",
                 solnCoefs
             );
             logger.beg("set eqn coefs");

@@ -58,7 +58,7 @@ namespace Amanzi {
                 }
                 return s;
             }
-            virtual size_t parentFaceLocalIndex(size_t C, size_t g) const = 0;
+            virtual int parentFaceLocalIndex(size_t C, size_t g) const = 0;
             Entity_ID_List childrenFacesGlobalIndicies(size_t C, size_t F) const {
                 Entity_ID_List res;
                 auto n = numbOfExtFaces(C);
