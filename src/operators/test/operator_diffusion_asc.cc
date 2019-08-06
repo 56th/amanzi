@@ -190,9 +190,12 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                     auto cellmatpoly_list = mof_driver.cell_matpoly_ptrs();
                     // https://github.com/laristra/tangram/blob/master/app/test_mof/test_mof_3d.cc
                     // create MatPoly's for single-material cells
-                    for (int icell = 0; icell < numbOfCells; icell++) 
-                        if (cell_num_mats[icell] == 1) {
-                            assert(cellmatpoly_list[icell] == nullptr);
+                    for (size_t icell = 0; icell < numbOfCells; icell++) 
+                        if (cell_num_mats[icell] == 1 || cellmatpoly_list[icell] == nullptr) {
+                            if (cell_num_mats[icell] != 1) {
+                                logger.buf << "MMC #" << icell << " marked to have " << cell_num_mats[icell] << " materials, but tangram was not able to create a polycell for it\ncreating a SMC instead";
+                                logger.wrn();
+                            }
                             std::shared_ptr<Tangram::CellMatPoly<3>> cmp_ptr(new Tangram::CellMatPoly<3>(icell));
                             Tangram::MatPoly<3> cell_matpoly;
                             cell_get_matpoly(meshWrapper, icell, &cell_matpoly);
