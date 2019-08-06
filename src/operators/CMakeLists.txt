@@ -12,6 +12,8 @@ add_definitions(-Wfatal-errors)
 set(MESHCONVERT ${ZLIB_ROOT}/bin/meshconvert)
 message(STATUS "meshconvert bin is ${MESHCONVERT}")
 add_definitions(-DMESHCONVERT=\"${MESHCONVERT}\")
+add_definitions(-DSEACAS_INCLUDE_DIR=\"${SEACAS_INCLUDE_DIR}\")
+
 
 # Amanzi module, include files found in AMANZI_MODULE_PATH
 include(PrintVariable)
@@ -179,7 +181,7 @@ add_amanzi_library(operators
                           ReconstructionCell.cc
                           RemapDG.cc RemapUtils.cc
                           HEADERS ${operators_inc_files}
-                   LINK_LIBS geometry mesh mesh_factory error_handling whetstone solvers data_structures ${Epetra_LIBRARIES})                          
+                   LINK_LIBS geometry mesh mesh_factory error_handling whetstone solvers data_structures ${Epetra_LIBRARIES} ${SEACAS_LIBRARIES})                          
 
 
 if (BUILD_TESTS)

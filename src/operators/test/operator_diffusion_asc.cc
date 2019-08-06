@@ -41,7 +41,8 @@
 #include "MeshMiniTangram.hh"
 
 // output
-#include "exodusII.h" 
+#include "exodusII.h" // make sure that SEACAS_HIDE_DEPRECATED_CODE is NOT defined
+
 // #include "OutputXDMF.hh"
 
 Tensor constTensor(double c) {
@@ -221,6 +222,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                         auto code = system((
                             meshconvert + ' ' + ioNameBaseGMV + ' ' + ioNameBaseEXO + " ; rm " + ioNameBaseGMV
                         ).c_str()); 
+                    #elif
+                        logger.wrn("MESHCONVERT macros (path to meshconvert app) is not defined");
                     #endif
                 logger.end();
             }
@@ -374,16 +377,31 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.end();
         if (exportWhat == 1) {
             logger.beg("export solution to " + ioNameBaseEXO);
-                char const * exPath = ioNameBaseEXO.c_str();
-                int exCPUWordSize = sizeof(double), exIOWordSize = 0, exErr; 
-                float exVersion;
-                auto exID = ex_open(exPath, EX_WRITE, &exCPUWordSize, &exIOWordSize, &exVersion);
-                if (exID >= 0) {
-                    // ...
-                    exErr = ex_close(exID);
-                    if (exErr != 0)
-                        logger.wrn("error closing .exo file");
-                } else logger.wrn("error opening .exo file");
+                #ifdef SEACAS_HIDE_DEPRECATED_CODE
+                    logger.buf 
+                        << SEACAS_INCLUDE_DIR << "/exodus_config.h: set SEACAS_HIDE_DEPRECATED_CODE to be undefined\n"
+                        << "otherwise ex_put_elem_var() and other funcs needed for output are not declared";
+                    logger.wrn();
+                #else
+                    char const * exPath = ioNameBaseEXO.c_str();
+                    int exCPUWordSize = sizeof(double), exIOWordSize = 0, exErr; 
+                    float exVersion;
+                    auto exID = ex_open(exPath, EX_WRITE, &exCPUWordSize, &exIOWordSize, &exVersion);
+                    if (exID >= 0) {
+                        std::vector<double> exPCell, exPCellExact;
+                        for (size_t C = 0; C < numbOfCells; ++C) 
+                            for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c) {
+                                exPCell.push_back(pCell[c][C]);
+                                exPCellExact.push_back(pCellExact[c][C]);
+                            }
+                        // exErr = ex_put_elem_var(exID, 0, 1, 0, exPCell.size(), exPCell.data());
+
+                        // ...
+                        exErr = ex_close(exID);
+                        if (exErr != 0)
+                            logger.wrn("error closing .exo file");
+                    } else logger.wrn("error opening .exo file");
+                #endif
             logger.end();
             // logger.beg("export soln (test/io/*)");
             //     logger.beg("export tangram poly-cells to .gmv and convert to .exo w/o cell renumbering");
