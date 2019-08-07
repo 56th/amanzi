@@ -215,7 +215,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.end();
             if (exportWhat == 0 || exportWhat == 1) {
                 logger.beg("export tangram poly-cells to .gmv and convert to .exo");
-                    // write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_mof.gmv");
+                    // write_to_gmv(meshWrapper, numbOfMat, cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_mof.gmv");
                     write_to_gmv(cellmatpoly_list, ioNameBaseGMV);
                     #ifdef MESHCONVERT
                         std::string meshconvert = MESHCONVERT;
@@ -232,6 +232,9 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             Teuchos::RCP<const MeshMini> meshMini;
             if (meshMiniIndex == 0) meshMini = Teuchos::rcp(new MeshMiniEmpty(mesh));
             else meshMini = Teuchos::rcp(new MeshMiniTangram(mesh, cellmatpoly_list, deleteEmptyFacesTol, meshMiniCheck));
+            auto numbOfMat = meshMini->numbOfMaterials();
+            logger.buf << "numb of materials = " << numbOfMat;
+            logger.log();
         logger.end();
         logger.beg("set exact soln");
             DiffusionReactionEqn eqn;
@@ -254,7 +257,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 return constTensor(k);
             }).setReaction(eqn.c).setRHS(eqn.f(), 0.).setBC(bc, 0.).assembleLocalConsentrationSystems();
             CompositeVectorSpace cvsP, cvsU;
-            cvsP.SetMesh(mesh)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, meshMini->maxNumbOfMaterials());
+            cvsP.SetMesh(mesh)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, numbOfMat);
             cvsP.AddComponent("face", AmanziMesh::FACE, 1);
             cvsU.SetMesh(mesh)->SetGhosted(true)->AddComponent("face", AmanziMesh::FACE, 1);
             auto  p     = CompositeVector(cvsP);
@@ -388,15 +391,73 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                     float exVersion;
                     auto exID = ex_open(exPath, EX_WRITE, &exCPUWordSize, &exIOWordSize, &exVersion);
                     if (exID >= 0) {
-                        std::vector<double> exPCell, exPCellExact;
+                        // std::vector<double> exPCell, exPCellExact;
+                        // for (size_t C = 0; C < numbOfCells; ++C) 
+                        //     for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c) {
+                        //         exPCell.push_back(pCell[c][C]);
+                        //         exPCellExact.push_back(pCellExact[c][C]);
+                        //     }
+                        int numVars;
+                        exErr = ex_get_var_param(exID, "g", &numVars);
+                        logger.buf << "numb of global  vars: " << numVars << '\n';
+                        exErr = ex_get_var_param(exID, "n", &numVars);
+                        logger.buf << "numb of nodal   vars: " << numVars << '\n';
+                        exErr = ex_get_var_param(exID, "e", &numVars);
+                        logger.buf << "numb of element vars: " << numVars;
+                        logger.log();
+                        std::vector<char const *> varNames = { 
+                            "p_h", "p_*", 
+                            "u_h_x", "u_h_y", "u_h_z", // to plot w/ paraview:
+                            "u_*_x", "u_*_y", "u_*_z"  // https://public.kitware.com/pipermail/paraview/2012-October/026308.html
+                        };
+                        numVars += varNames.size(); // for p_h and p_* and components of corresponding fluxes
+                        exErr = ex_put_var_param(exID, "e", numVars);
+                        if (exErr != 0) logger.wrn("cannot write the number of element variable");
+                        exErr = ex_put_var_names(exID, "e", numVars, const_cast<char**>(varNames.data()));
+                        if (exErr != 0) logger.wrn("cannot write element variable names");
+                        double t = 0.;
+                        exErr = ex_put_time(exID, 1, &t);
+                        if (exErr != 0) logger.wrn("cannot write time step");
+                        std::vector<std::vector<double>> // pressure
+                            exPCell(numbOfMat),
+                            exPCellExact(numbOfMat);
+                        std::vector<std::vector<Node>> // fluxes
+                            exUCell(numbOfMat),
+                            exUCellExact(numbOfMat);
+                        auto flux = eqn.u();
                         for (size_t C = 0; C < numbOfCells; ++C) 
                             for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c) {
-                                exPCell.push_back(pCell[c][C]);
-                                exPCellExact.push_back(pCellExact[c][C]);
+                                auto id = meshMini->materialIndex(C, c);
+                                exPCell[id].push_back(pCell[c][C]);
+                                exPCellExact[id].push_back(pCellExact[c][C]);
+                                exUCell[id].push_back(Node(0., 0., 0.)); // tmp
+                                exUCellExact[id].push_back(flux(meshMini->centroid(C, c), 0.));
                             }
-                        // exErr = ex_put_elem_var(exID, 0, 1, 0, exPCell.size(), exPCell.data());
-
-                        // ...
+                        for (size_t i = 0; i < numbOfMat; ++i) {
+                            auto nCells = exPCell[i].size();
+                            logger.buf << "material block #" << i + 1 << ": " << exPCell[i].size() << " cells/values";
+                            logger.log();
+                            // pressure 
+                            exErr = ex_put_elem_var(exID, 1, 1, i + 1, nCells, exPCell[i].data());
+                            if (exErr != 0) logger.wrn("error writing p_h cell values");
+                            exErr = ex_put_elem_var(exID, 1, 2, i + 1, nCells, exPCellExact[i].data());
+                            if (exErr != 0) logger.wrn("error writing p_* cell values");
+                            // flux
+                            for (size_t j = 0; j < 3; ++j) { // for each component
+                                std::vector<double> exUCellComp;
+                                exUCellComp.reserve(nCells);
+                                for (auto const & v : exUCell[i]) exUCellComp.push_back(v[j]);
+                                exErr = ex_put_elem_var(exID, 1, 3 + j, i + 1, nCells, exUCellComp.data());
+                                if (exErr != 0) logger.wrn("error writing u_h cell values");
+                            }
+                            for (size_t j = 0; j < 3; ++j) { // for each component
+                                std::vector<double> exUCellComp;
+                                exUCellComp.reserve(nCells);
+                                for (auto const & v : exUCellExact[i]) exUCellComp.push_back(v[j]);
+                                exErr = ex_put_elem_var(exID, 1, 6 + j, i + 1, nCells, exUCellComp.data());
+                                if (exErr != 0) logger.wrn("error writing u_* cell values");
+                            }
+                        }
                         exErr = ex_close(exID);
                         if (exErr != 0)
                             logger.wrn("error closing .exo file");
@@ -409,7 +470,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             //             for (auto& id : const_cast<std::vector<int>&>(cmp->matpoly_matids()))
             //                 id = 0;
             //         for (auto& id : cell_mat_ids) id = 0;
-            //         write_to_gmv(meshWrapper, meshMini->maxNumbOfMaterials(), cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_flat.gmv");
+            //         write_to_gmv(meshWrapper, numbOfMat, cell_num_mats, cell_mat_ids, cellmatpoly_list, ioNameBase + "_flat.gmv");
             //         // write_to_gmv(cellmatpoly_list, ioNameBase + "_flat.gmv");
             //         int code;
             //         #ifdef MESHCONVERT

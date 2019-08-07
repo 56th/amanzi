@@ -7,6 +7,7 @@
 #ifndef AMANZI_MESH_MINI_HH_
 #define AMANZI_MESH_MINI_HH_
 
+#include <unordered_set>
 #include "Mesh.hh"
 
 namespace Amanzi {
@@ -31,8 +32,16 @@ namespace Amanzi {
             // * normals of external mini-faces point outside
             virtual size_t numbOfFaces(size_t C) const = 0;
             virtual size_t numbOfExtFaces(size_t C) const = 0;
-            virtual size_t numbOfMaterials(size_t C) const = 0;
-            size_t maxNumbOfMaterials() const {
+            virtual size_t numbOfMaterials(size_t C) const = 0; // in a macro-cell
+            size_t numbOfMaterials() const { // in a mesh
+                std::unordered_set<size_t> matIDs;
+                auto n = mesh_->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
+                for (size_t i = 0; i < n; ++i)
+                    for (size_t j = 0; j < numbOfMaterials(i); ++j)
+                        matIDs.insert(materialIndex(i, j));
+                return matIDs.size();
+            } 
+            size_t maxNumbOfMaterials() const { // over all macro-cells
                 auto n = mesh_->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
                 size_t max = 0;
                 for (size_t i = 0; i < n; ++i)
