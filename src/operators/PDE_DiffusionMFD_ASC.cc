@@ -22,7 +22,7 @@ namespace Amanzi {
             mesh_->face_get_cells(faceIndex, AmanziMesh::Parallel_type::ALL, &cellIndicies);
             return cellIndicies.size() == 1;
         }
-        double PDE_DiffusionMFD_ASC::getMoment_(size_t m, size_t faceIndex, ScalarFunc const & f, double t = 0.) const {
+        double PDE_DiffusionMFD_ASC::getMoment_(size_t m, size_t faceIndex, ScalarFunc const & f) const {
             auto& logger = SingletonLogger::instance();
             std::string err = __func__;
             err += ": ";
@@ -42,9 +42,9 @@ namespace Amanzi {
                 throw std::invalid_argument(err + "cannot find loc index of the face in its adj cell");
             auto res = 0.;
             for (auto i : meshMini_->childrenFacesGlobalIndicies(c, faceLocalIndex)) 
-                res += f(meshMini_->faceCentroid(c, i), t) * meshMini_->area(c, i);
+                res += f(meshMini_->faceCentroid(c, i)) * meshMini_->area(c, i);
             res /= mesh_->face_area(faceIndex);
-            auto diff = res - f(mesh_->face_centroid(faceIndex), 0.);
+            // auto diff = res - f(mesh_->face_centroid(faceIndex));
             // if (!fpEqual(diff, 0.)) {
             //     logger.buf << "macro face #" << faceIndex << " moments diff = " << diff;
             //     logger.log();
@@ -62,7 +62,7 @@ namespace Amanzi {
                 lambdaCoarse(i) = lambda[0][macroFacesIndicies[i]];
             return backSubstLocalMatrices_[c].R * lambdaCoarse;
         }
-        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::setDiffusion(TensorFuncInd const & K) {
+        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::setDiffusion(TensorFunc const & K) {
             auto& logger = SingletonLogger::instance();
             logger.beg("set diffusion");
                 for (size_t c = 0; c < ncells_owned; ++c) {
@@ -70,12 +70,12 @@ namespace Amanzi {
                     auto n = meshMini_->numbOfMaterials(c);
                     K_[c].resize(n);
                     for (size_t i = 0; i < n; ++i)
-                        K_[c][i] = K(meshMini_->materialIndex(c, i));
+                        K_[c][i] = K(meshMini_->centroid(c, i));
                 }
             logger.end();
             return *this;
         }
-        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::setRHS(ScalarFunc const & f, double t = 0.) {
+        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::setRHS(ScalarFunc const & f) {
             auto& logger = SingletonLogger::instance();
             logger.beg("set rhs");
                 for (size_t c = 0; c < ncells_owned; ++c) {
@@ -83,7 +83,7 @@ namespace Amanzi {
                     auto n = meshMini_->numbOfMaterials(c);
                     f_[c].resize(n);
                     for (size_t i = 0; i < n; ++i) 
-                        f_[c][i] = f(meshMini_->centroid(c, i), t) * meshMini_->volume(c, i);
+                        f_[c][i] = f(meshMini_->centroid(c, i)) * meshMini_->volume(c, i);
                 }
             logger.end();
             return *this;
@@ -92,7 +92,7 @@ namespace Amanzi {
             c_ = c;
             return *this;
         }
-        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::setBC(PDE_DiffusionMFD_ASC::BC const & bc, double t = 0.) {
+        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::setBC(PDE_DiffusionMFD_ASC::BC const & bc) {
             if (bc.type == BCType::Neumann) throw std::invalid_argument("setBC: Neumann bc is not yet implemented");
             auto BC = Teuchos::rcp(new BCs(mesh_, AmanziMesh::FACE, WhetStone::DOF_Type::SCALAR));
             auto& logger = SingletonLogger::instance();
@@ -103,7 +103,7 @@ namespace Amanzi {
                     logger.pro(f + 1, nfaces_owned);
                     m += !faceIsFlat_(f);
                     if (faceIsBndry_(f) && bc.p(mesh_->face_centroid(f))) {
-                        BC->bc_value()[f] = getMoment_(0, f, bc.f, t);
+                        BC->bc_value()[f] = getMoment_(0, f, bc.f);
                         BC->bc_model()[f] = OPERATOR_BC_DIRICHLET;
                         area += mesh_->face_area(f);
                         mean += mesh_->face_area(f) * BC->bc_value()[f];
@@ -295,7 +295,7 @@ namespace Amanzi {
                             //     logger.buf << "lambda fine exact (from BCs) / lambda fine recovered diff = " << diff;
                             //     logger.log();
                             // }
-                            lambdaFine(i) = (*gD)(meshMini_->faceCentroid(c, i), 0.);
+                            lambdaFine(i) = (*gD)(meshMini_->faceCentroid(c, i));
                         }
                     }
                 }
@@ -323,15 +323,15 @@ namespace Amanzi {
             if (fluxRes != nullptr) *fluxRes = sqrt(l2);
             return *this;
         }
-        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::computeExactConcentrations(Epetra_MultiVector& res, ScalarFunc const & p, double t = 0.) {
+        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::computeExactConcentrations(Epetra_MultiVector& res, ScalarFunc const & p) {
             for (size_t f = 0; f < nfaces_owned; ++f)
-                res[0][f] = getMoment_(0, f, p, t);
+                res[0][f] = getMoment_(0, f, p);
             return *this;
         }
-        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::computeExactCellVals(Epetra_MultiVector& res, ScalarFunc const & p, double t = 0.) {
+        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::computeExactCellVals(Epetra_MultiVector& res, ScalarFunc const & p) {
             for (size_t C = 0; C < ncells_owned; ++C) 
                 for (size_t c = 0; c < meshMini_->numbOfMaterials(C); ++c)
-                    res[c][C] = p(meshMini_->centroid(C, c), t);
+                    res[c][C] = p(meshMini_->centroid(C, c));
             return *this;
         }
         bool PDE_DiffusionMFD_ASC::massMatrixIsExact_(WhetStone::DenseMatrix const & W, size_t c, double* diff) const {

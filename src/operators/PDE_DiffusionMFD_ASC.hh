@@ -17,8 +17,8 @@ namespace Amanzi {
         class PDE_DiffusionMFD_ASC : public PDE_Abstract {
         public:
             using Node = AmanziGeometry::Point;
-            using ScalarFunc = std::function<double(Node const &, double)>;
-            using TensorFuncInd = std::function<WhetStone::Tensor(size_t)>;
+            using ScalarFunc = std::function<double(Node const &)>;
+            using TensorFunc = std::function<WhetStone::Tensor(Node const &)>;
             using Predicate = std::function<bool(Node const &)>;
             enum class BCType { Dirichlet, Neumann };
             struct BC {
@@ -53,13 +53,13 @@ namespace Amanzi {
                 MFD_.ModifyStabilityScalingFactor(1.);
             }
             PDE_DiffusionMFD_ASC& assembleLocalConsentrationSystems();
-            PDE_DiffusionMFD_ASC& computeExactConcentrations(Epetra_MultiVector&, ScalarFunc const &, double);
-            PDE_DiffusionMFD_ASC& computeExactCellVals(Epetra_MultiVector&, ScalarFunc const &, double);
+            PDE_DiffusionMFD_ASC& computeExactConcentrations(Epetra_MultiVector&, ScalarFunc const &);
+            PDE_DiffusionMFD_ASC& computeExactCellVals(Epetra_MultiVector&, ScalarFunc const &);
             PDE_DiffusionMFD_ASC& recoverSolution(CompositeVector&, CompositeVector&, ScalarFunc const *, double*);
-            PDE_DiffusionMFD_ASC& setDiffusion(TensorFuncInd const &);
-            PDE_DiffusionMFD_ASC& setRHS(ScalarFunc const &, double);
+            PDE_DiffusionMFD_ASC& setDiffusion(TensorFunc const &);
+            PDE_DiffusionMFD_ASC& setRHS(ScalarFunc const &);
             PDE_DiffusionMFD_ASC& setReaction(double);
-            PDE_DiffusionMFD_ASC& setBC(BC const &, double);
+            PDE_DiffusionMFD_ASC& setBC(BC const &);
         private:
             Teuchos::ParameterList plist_;
             Teuchos::RCP<const AmanziMesh::MeshMini> meshMini_;
@@ -73,7 +73,7 @@ namespace Amanzi {
             WhetStone::DenseVector getLocalConcentrations_(size_t, Epetra_MultiVector const &) const;
             LocalSystem assembleLocalSystem_(size_t);
             BackSubstLocalMatrices computeBackSubstLocalMatrices_(LocalSystem const &);
-            double getMoment_(size_t, size_t, ScalarFunc const &, double) const;
+            double getMoment_(size_t, size_t, ScalarFunc const &) const;
             bool faceIsFlat_(size_t) const;
             bool faceIsBndry_(size_t) const;
             bool massMatrixIsExact_(WhetStone::DenseMatrix const &, size_t c, double*) const;
