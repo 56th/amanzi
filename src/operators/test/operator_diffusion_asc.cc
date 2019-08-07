@@ -42,7 +42,6 @@
 
 // output
 #include "exodusII.h" // make sure that SEACAS_HIDE_DEPRECATED_CODE is NOT defined
-
 // #include "OutputXDMF.hh"
 
 Tensor constTensor(double c) {
@@ -121,6 +120,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 logger.inp("set reaction coef", c);
             logger.end();
             auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
+            auto useExactFineLambdas = logger.yes("use exact lambdas on bndry mini-faces to recover cell vals / fluxes (note that \"yes\" will lead to a nonzero flux residual, but may improve l-inf pressure cell error)");
             double deleteEmptyFacesTol;
             logger.inp("delete empty mini-faces area tol (put -1. for no deletion)", deleteEmptyFacesTol);
             auto meshMiniIndex = logger.opt("mini-mesh type", { "empty", "tangram" });
@@ -318,7 +318,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             pFace = pFaceExact;
         logger.beg("recover cell pressure vals and fluxes");
             double fluxRes;
-            op.recoverSolution(p, u, &fluxRes);
+            op.recoverSolution(p, u, useExactFineLambdas ? &bc.f : nullptr, &fluxRes);
             // logger.buf << "pressure concentration / cell computed solution:\n" << pFace << pCell;
             // logger.log();
             // logger.buf << "pressure cell exact solution:\n" << pCellExact;

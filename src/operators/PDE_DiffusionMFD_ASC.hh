@@ -55,7 +55,7 @@ namespace Amanzi {
             PDE_DiffusionMFD_ASC& assembleLocalConsentrationSystems();
             PDE_DiffusionMFD_ASC& computeExactConcentrations(Epetra_MultiVector&, ScalarFunc const &, double);
             PDE_DiffusionMFD_ASC& computeExactCellVals(Epetra_MultiVector&, ScalarFunc const &, double);
-            PDE_DiffusionMFD_ASC& recoverSolution(CompositeVector&, CompositeVector&, double*);
+            PDE_DiffusionMFD_ASC& recoverSolution(CompositeVector&, CompositeVector&, ScalarFunc const *, double*);
             PDE_DiffusionMFD_ASC& setDiffusion(TensorFuncInd const &);
             PDE_DiffusionMFD_ASC& setRHS(ScalarFunc const &, double);
             PDE_DiffusionMFD_ASC& setReaction(double);

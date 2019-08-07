@@ -23,8 +23,33 @@ namespace Amanzi {
             return cellIndicies.size() == 1;
         }
         double PDE_DiffusionMFD_ASC::getMoment_(size_t m, size_t faceIndex, ScalarFunc const & f, double t = 0.) const {
-            if (m != 0) throw std::invalid_argument("getMoment: not implemented for m > 0");
-            return f(mesh_->face_centroid(faceIndex), t);
+            auto& logger = SingletonLogger::instance();
+            std::string err = __func__;
+            err += ": ";
+            if (m != 0) 
+                throw std::invalid_argument(err + "not implemented for m > 0");
+            AmanziMesh::Entity_ID_List cellIndicies;
+            mesh_->face_get_cells(faceIndex, AmanziMesh::Parallel_type::ALL, &cellIndicies);
+            auto c = cellIndicies.front();
+            auto faceIndicies = meshMini_->macroFacesIndicies(c);
+            int faceLocalIndex = -1;
+            for (size_t i = 0; i < faceIndicies.size(); ++i)
+                if (faceIndicies[i] == faceIndex) {
+                    faceLocalIndex = i;
+                    break;
+                }
+            if (faceLocalIndex == -1)
+                throw std::invalid_argument(err + "cannot find loc index of the face in its adj cell");
+            auto res = 0.;
+            for (auto i : meshMini_->childrenFacesGlobalIndicies(c, faceLocalIndex)) 
+                res += f(meshMini_->faceCentroid(c, i), t) * meshMini_->area(c, i);
+            res /= mesh_->face_area(faceIndex);
+            auto diff = res - f(mesh_->face_centroid(faceIndex), 0.);
+            // if (!fpEqual(diff, 0.)) {
+            //     logger.buf << "macro face #" << faceIndex << " moments diff = " << diff;
+            //     logger.log();
+            // }
+            return res;
         }
         WhetStone::DenseVector PDE_DiffusionMFD_ASC::getLocalRHS_(size_t c) const {
             return WhetStone::DenseVector(f_[c].size(), const_cast<double *>(f_[c].data()));
@@ -243,14 +268,13 @@ namespace Amanzi {
             res.R = localSystem.R;
             return res;
         }
-        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::recoverSolution(CompositeVector& P, CompositeVector& U, double* fluxRes = nullptr) {
+        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::recoverSolution(CompositeVector& P, CompositeVector& U, ScalarFunc const * gD = nullptr, double* fluxRes = nullptr) {
             auto& logger = SingletonLogger::instance();
             auto& p      = *P.ViewComponent("cell", true);
             auto& lambda = *P.ViewComponent("face", true); 
             auto& u      = *U.ViewComponent("face", true);
             std::vector<bool> vis(nfaces_owned, false);
             auto l2 = 0.;
-            logger.wrn("TODO: use BCs to correct vals of lambdaFine");
             for (size_t c = 0; c < ncells_owned; ++c) {
                 logger.pro(c + 1, ncells_owned);
                 auto& W = backSubstLocalMatrices_[c].W;
@@ -258,6 +282,23 @@ namespace Amanzi {
                 auto& BWBt_plus_cSigma_inv = backSubstLocalMatrices_[c].BWBt_plus_cSigma_inv;
                 auto& EC = backSubstLocalMatrices_[c].EC;
                 auto lambdaFine = getLocalConcentrations_(c, lambda);
+                auto macroFacesIndicies = meshMini_->macroFacesIndicies(c);
+                // use BCs to correct vals of lambdaFine
+                if (gD != nullptr) {
+                    auto const & bcModelTrial = bcs_trial_[0]->bc_model();
+                    for (size_t i = 0; i < meshMini_->numbOfExtFaces(c); ++i) {
+                        auto f = meshMini_->parentFaceLocalIndex(c, i);
+                        auto F = macroFacesIndicies[f];
+                        if (bcModelTrial[F] == OPERATOR_BC_DIRICHLET) {
+                            // auto diff = lambdaFine(i) - (*gD)(meshMini_->faceCentroid(c, i), 0.);
+                            // if (!fpEqual(diff, 0.)) {
+                            //     logger.buf << "lambda fine exact (from BCs) / lambda fine recovered diff = " << diff;
+                            //     logger.log();
+                            // }
+                            lambdaFine(i) = (*gD)(meshMini_->faceCentroid(c, i), 0.);
+                        }
+                    }
+                }
                 // recover pressure cell vals
                 auto pLocal = BWBt_plus_cSigma_inv * (getLocalRHS_(c) + BW * EC * lambdaFine);
                 // recover flux vals
@@ -266,7 +307,6 @@ namespace Amanzi {
                 for (size_t i = 0; i < pLocal.NumRows(); ++i)
                     p[i][c] = pLocal(i);   
                 // global fluxes     
-                auto macroFacesIndicies = meshMini_->macroFacesIndicies(c);
                 for (size_t i = 0; i < macroFacesIndicies.size(); ++i) {
                     auto f = macroFacesIndicies[i];
                     auto uF = 0.;
