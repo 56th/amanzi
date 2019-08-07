@@ -94,6 +94,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 for (auto i = directory_iterator(p); i != directory_iterator(); ++i)
                     if (!is_directory(i->path()))
                         meshNames.emplace_back(i->path().filename().string());
+                std::sort(meshNames.begin(), meshNames.end());
             }
             auto meshIndex = logger.opt("choose mesh", meshNames);
             auto meshName = meshNames[meshIndex];
