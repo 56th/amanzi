@@ -103,9 +103,10 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 if (noise < 0.) noise = 0.;
                 if (noise > 1.) noise = 1.;
             logger.end();
+            auto solnIndex = logger.opt("choose in which material i in { 0, 1, 2 } region exact soln p_i will be defined", { "0", "1", "2" });
             std::array<double, 4> solnCoefs;
             logger.inp(
-                "set coefs { a, b, c, d } for exact solution p,\np(x, y, z) = p_1(x, y, z) = a x + b y + c z + d in material region #1",
+                "set coefs { a, b, c, d } for exact solution p_" + std::to_string(solnIndex) + "(x, y, z) = a x + b y + c z + d",
                 solnCoefs
             );
             logger.beg("set eqn coefs");
@@ -120,7 +121,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.inp("delete empty mini-faces area tol (put -1. for no deletion)", deleteEmptyFacesTol);
             auto meshMiniIndex = logger.opt("mini-mesh type", { "empty", "tangram" });
             if (n1 != n2 && meshMiniIndex == 1)
-                logger.wrn("tangram does not divede T-junction face into two subface; this case currently is not handled by ASC");
+                logger.wrn("tangram does not divide T-junction face into two subface; this case currently is not handled by ASC");
             auto meshMiniCheck = logger.yes("check mini-mesh");
             auto exportWhat = logger.opt("export", { "mof mesh only", "soln", "none" });
             logger.exp("stdin.txt");
@@ -234,14 +235,22 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.end();
         logger.beg("set up pw linear exact soln");
             DiffusionReactionEqnPwLinear eqn(
-                solnCoefs, k[0], c
+                3 /* numb of regions */, solnIndex,
+                solnCoefs, k[solnIndex], c
             );
-            eqn
-                .addPiece(k[1], Node(p1[0], p1[1], p1[2]), Node(n1[0], n1[1], n1[2]))
-                .addPiece(k[2], Node(p2[0], p2[1], p2[2]), Node(n2[0], n2[1], n2[2]));
+            Node N0(n1[0], n1[1], n1[2]), N1(n2[0], n2[1], n2[2]), P0(p1[0], p1[1], p1[2]), P1(p2[0], p2[1], p2[2]);
+            if (solnIndex == 0)
+                eqn.addPiece(k[1], P0, N0, 0, 1)
+                   .addPiece(k[2], P1, N1, 1, 2);
+            if (solnIndex == 2)
+                eqn.addPiece(k[1], P1, N1, 2, 1)
+                   .addPiece(k[0], P0, N0, 1, 0);
+            if (solnIndex == 1)
+                eqn.addPiece(k[0], P0, N0, 1, 0)
+                   .addPiece(k[2], P1, N1, 1, 2);
             for (size_t i : { 0, 1, 2 }) {
                 auto abcd = eqn.abcd(i);
-                logger.buf << "p_" << i + 1 << "(x, y, z) = " 
+                logger.buf << "p_" << i << "(x, y, z) = " 
                     << abcd[0] << " x + "
                     << abcd[1] << " y + "
                     << abcd[2] << " z + " << abcd[3] << '\n';

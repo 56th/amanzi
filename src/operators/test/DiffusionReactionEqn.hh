@@ -64,14 +64,15 @@ class DiffusionReactionEqnPwLinear : public DiffusionReactionEqn {
     std::vector<DiffusionReactionEqnLinear> eqns_;
 public:
     DiffusionReactionEqnPwLinear(
+        size_t numbOfMaterials = 1, size_t matIndex = 0, 
         std::array<double, 4> abcd = { 0., 0., 0., 1. },
         double k = 1., double c = 0.
-    ) {
-        DiffusionReactionEqnLinear eqn(abcd, k, c);
-        eqns_.push_back(eqn);
+    ) : eqns_(numbOfMaterials) {
+        eqns_[matIndex] = DiffusionReactionEqnLinear(abcd, k, c);
     }
-    DiffusionReactionEqnPwLinear& addPiece(double k, Node const & p, Node const & n) {
+    DiffusionReactionEqnPwLinear& addPiece(double k, Node const & p, Node const & n, size_t matIndex, size_t matIndexNew) {
         auto& logger = SingletonLogger::instance();
+        auto& eqn = eqns_[matIndex];
         std::array<Node, 3> x;
         // pick 3 pts
         auto e = Node(1., 0., 0.);
@@ -95,9 +96,9 @@ public:
         Amanzi::WhetStone::DenseMatrix mtx(4, 4);
         Amanzi::WhetStone::DenseVector rhs(4);
         // set up rhs
-        rhs(0) = -(eqns_.back().u(p) * n / k);
+        rhs(0) = -(eqn.u(p) * n / k);
         for (size_t i : { 1, 2, 3 })
-            rhs(i) = eqns_.back().p(x[i - 1]);
+            rhs(i) = eqn.p(x[i - 1]);
         // set up mtx
         for (size_t i : { 0, 1, 2 })
             mtx(0, i) = n[i];
@@ -110,12 +111,12 @@ public:
         // recover sln
         mtx.Inverse();
         auto sln = mtx * rhs;
-        DiffusionReactionEqnLinear eqn({ sln(0), sln(1), sln(2), sln(3) }, k, c());
-        if (!fpEqual(eqns_.back().p(p) - eqns_.back().p(p), 0.))
+        DiffusionReactionEqnLinear newEqn({ sln(0), sln(1), sln(2), sln(3) }, k, c());
+        if (!fpEqual(eqn.p(p) - newEqn.p(p), 0.))
             logger.wrn("solution is not cont");
-        if (!fpEqual((eqns_.back().u(p) - eqns_.back().u(p)) * n, 0.))
+        if (!fpEqual((eqn.u(p) - newEqn.u(p)) * n, 0.))
             logger.wrn("normal flux is not cont");
-        eqns_.push_back(eqn);
+        eqns_[matIndexNew] = newEqn;
         return *this;
     }
     std::array<double, 4> abcd(size_t matIndex) {
