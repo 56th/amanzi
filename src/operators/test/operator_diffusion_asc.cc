@@ -115,7 +115,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 logger.inp("set reaction coef", c);
             logger.end();
             auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
-            auto useExactFineLambdas = logger.yes("use exact lambdas on bndry mini-faces to recover cell vals / fluxes (note that \"yes\" will lead to a nonzero flux residual, but may improve l-inf pressure cell error)");
+            auto useExactFineLambdas = logger.yes("use exact lambdas on bndry mini-faces to recover cell vals / fluxes\n(note that \"yes\" will lead to a nonzero flux residual, but may improve l-inf pressure cell error)");
             double deleteEmptyFacesTol;
             logger.inp("delete empty mini-faces area tol (put -1. for no deletion)", deleteEmptyFacesTol);
             auto meshMiniIndex = logger.opt("mini-mesh type", { "empty", "tangram" });
@@ -406,7 +406,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                         std::vector<char const *> varNames = { 
                             "p_h", "p_*", 
                             "u_h_x", "u_h_y", "u_h_z", // to plot w/ paraview:
-                            "u_*_x", "u_*_y", "u_*_z"  // https://public.kitware.com/pipermail/paraview/2012-October/026308.html
+                            "u_*_x", "u_*_y", "u_*_z",  // https://public.kitware.com/pipermail/paraview/2012-October/026308.html
+                            "k"
                         };
                         numVars += varNames.size(); // for p_h and p_* and components of corresponding fluxes
                         exErr = ex_put_var_param(exID, "e", numVars);
@@ -418,7 +419,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                         if (exErr != 0) logger.wrn("cannot write time step");
                         std::vector<std::vector<double>> // pressure
                             exPCell(numbOfMat),
-                            exPCellExact(numbOfMat);
+                            exPCellExact(numbOfMat),
+                            exK(numbOfMat); // diffusion
                         std::vector<std::vector<Node>> // fluxes
                             exUCell(numbOfMat),
                             exUCellExact(numbOfMat);
@@ -429,6 +431,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                                 exPCellExact[id].push_back(pCellExact[c][C]);
                                 exUCell[id].push_back(Node(0., 0., 0.)); // tmp
                                 exUCellExact[id].push_back(eqn.u(meshMini->centroid(C, c), meshMini->materialIndex(C, c)));
+                                exK[id].push_back(eqn.K(meshMini->centroid(C, c), meshMini->materialIndex(C, c))(0, 0));
                             }
                         for (size_t i = 0; i < numbOfMat; ++i) {
                             auto nCells = exPCell[i].size();
@@ -454,6 +457,9 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                                 exErr = ex_put_elem_var(exID, 1, 6 + j, i + 1, nCells, exUCellComp.data());
                                 if (exErr != 0) logger.wrn("error writing u_* cell values");
                             }
+                            // diffusion
+                            exErr = ex_put_elem_var(exID, 1, 9, i + 1, nCells, exK[i].data());
+                            if (exErr != 0) logger.wrn("error writing K cell values");
                         }
                         exErr = ex_close(exID);
                         if (exErr != 0)
