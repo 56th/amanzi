@@ -10,13 +10,13 @@ using Tensor = Amanzi::WhetStone::Tensor;
 
 class DiffusionReactionEqn {
 public:
-    virtual double p(Node const &) = 0; // pressure
-    virtual Node   pGrad(Node const &) = 0; // its gradient
-    virtual Tensor K(Node const &) = 0;
-    virtual double f(Node const &) = 0;
+    virtual double p(Node const &, size_t matIndex = 0) = 0; // pressure
+    virtual Node   pGrad(Node const &, size_t matIndex = 0) = 0; // its gradient
+    virtual Tensor K(Node const &, size_t matIndex = 0) = 0;
+    virtual double f(Node const &, size_t matIndex = 0) = 0;
     virtual double c() = 0;
-    Node u(Node const & x) { // flux
-        return -(K(x) * pGrad(x));
+    Node u(Node const & x, size_t matIndex = 0) { // flux
+        return -(K(x, matIndex) * pGrad(x, matIndex));
     }
 };
 
@@ -36,17 +36,20 @@ public:
     , K_(3, 2) {
         K_.MakeDiagonal(k); 
     }
-    double p(Node const & x) final {
+    std::array<double, 4> abcd() {
+        return { abc_[0], abc_[1], abc_[2], d_ };
+    }
+    double p(Node const & x, size_t matIndex = 0) final {
         return abc_ * x + d_;
     }
-    Node pGrad(Node const &) final {
+    Node pGrad(Node const &, size_t matIndex = 0) final {
         return abc_;
     }
-    Tensor K(Node const &) final {
+    Tensor K(Node const &, size_t matIndex = 0) final {
         return K_;
     }
-    double f(Node const & x) final {
-        return c_ * p(x);
+    double f(Node const & x, size_t matIndex = 0) final {
+        return c_ * p(x, matIndex);
     }
     double c() final {
         return c_;
@@ -54,14 +57,7 @@ public:
 };
 
 class DiffusionReactionEqnPwLinear : public DiffusionReactionEqn {
-    // std::unordered_map<Node, size_t> c2r_;
     std::vector<DiffusionReactionEqnLinear> eqns_;
-    size_t ctr2reg_(Node const & x) {
-        if (eqns_.size() == 0) return 0;
-        // ...
-        // return c2r_.at(x)
-        return 0;
-    }
 public:
     DiffusionReactionEqnPwLinear(
         std::array<double, 4> abcd = { 0., 0., 0., 1. },
@@ -70,17 +66,24 @@ public:
         DiffusionReactionEqnLinear eqn(abcd, k, c);
         eqns_.push_back(eqn);
     }
-    double p(Node const & x) final {
-        return eqns_[ctr2reg_(x)].p(x);
+    DiffusionReactionEqnPwLinear& addPiece(double k, Node const & p, Node const & n) {
+        eqns_.push_back(eqns_.back());
+        return *this;
     }
-    Node pGrad(Node const & x) final {
-        return eqns_[ctr2reg_(x)].pGrad(x);
+    std::array<double, 4> abcd(size_t matIndex) {
+        return eqns_[matIndex].abcd();
     }
-    Tensor K(Node const & x) final {
-        return eqns_[ctr2reg_(x)].K(x);
+    double p(Node const & x, size_t matIndex = 0) final {
+        return eqns_.at(matIndex).p(x);
     }
-    double f(Node const & x) final {
-        return eqns_[ctr2reg_(x)].f(x);
+    Node pGrad(Node const & x, size_t matIndex = 0) final {
+        return eqns_.at(matIndex).pGrad(x);
+    }
+    Tensor K(Node const & x, size_t matIndex = 0) final {
+        return eqns_.at(matIndex).K(x);
+    }
+    double f(Node const & x, size_t matIndex = 0) final {
+        return eqns_.at(matIndex).f(x);
     }
     double c() final {
         return eqns_.front().c();

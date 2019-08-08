@@ -17,8 +17,8 @@ namespace Amanzi {
         class PDE_DiffusionMFD_ASC : public PDE_Abstract {
         public:
             using Node = AmanziGeometry::Point;
-            using ScalarFunc = std::function<double(Node const &)>;
-            using TensorFunc = std::function<WhetStone::Tensor(Node const &)>;
+            using ScalarFunc = std::function<double(Node const &, size_t)>;
+            using TensorFunc = std::function<WhetStone::Tensor(Node const &, size_t)>;
             using Predicate = std::function<bool(Node const &)>;
             enum class BCType { Dirichlet, Neumann };
             struct BC {

@@ -41,8 +41,10 @@ namespace Amanzi {
             if (faceLocalIndex == -1)
                 throw std::invalid_argument(err + "cannot find loc index of the face in its adj cell");
             auto res = 0.;
-            for (auto i : meshMini_->childrenFacesGlobalIndicies(c, faceLocalIndex)) 
-                res += f(meshMini_->faceCentroid(c, i)) * meshMini_->area(c, i);
+            for (auto i : meshMini_->childrenFacesGlobalIndicies(c, faceLocalIndex)) {
+                auto matIndex = meshMini_->faceMaterialIndex(c, i);
+                res += f(meshMini_->faceCentroid(c, i), matIndex) * meshMini_->area(c, i);
+            }
             res /= mesh_->face_area(faceIndex);
             // auto diff = res - f(mesh_->face_centroid(faceIndex));
             // if (!fpEqual(diff, 0.)) {
@@ -70,7 +72,7 @@ namespace Amanzi {
                     auto n = meshMini_->numbOfMaterials(c);
                     K_[c].resize(n);
                     for (size_t i = 0; i < n; ++i)
-                        K_[c][i] = K(meshMini_->centroid(c, i));
+                        K_[c][i] = K(meshMini_->centroid(c, i), meshMini_->materialIndex(c, i));
                 }
             logger.end();
             return *this;
@@ -83,7 +85,7 @@ namespace Amanzi {
                     auto n = meshMini_->numbOfMaterials(c);
                     f_[c].resize(n);
                     for (size_t i = 0; i < n; ++i) 
-                        f_[c][i] = f(meshMini_->centroid(c, i)) * meshMini_->volume(c, i);
+                        f_[c][i] = f(meshMini_->centroid(c, i), meshMini_->materialIndex(c, i)) * meshMini_->volume(c, i);
                 }
             logger.end();
             return *this;
@@ -290,12 +292,13 @@ namespace Amanzi {
                         auto f = meshMini_->parentFaceLocalIndex(c, i);
                         auto F = macroFacesIndicies[f];
                         if (bcModelTrial[F] == OPERATOR_BC_DIRICHLET) {
+                            auto matIndex = meshMini_->faceMaterialIndex(c, i);
                             // auto diff = lambdaFine(i) - (*gD)(meshMini_->faceCentroid(c, i), 0.);
                             // if (!fpEqual(diff, 0.)) {
                             //     logger.buf << "lambda fine exact (from BCs) / lambda fine recovered diff = " << diff;
                             //     logger.log();
                             // }
-                            lambdaFine(i) = (*gD)(meshMini_->faceCentroid(c, i));
+                            lambdaFine(i) = (*gD)(meshMini_->faceCentroid(c, i), matIndex);
                         }
                     }
                 }
@@ -331,7 +334,7 @@ namespace Amanzi {
         PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::computeExactCellVals(Epetra_MultiVector& res, ScalarFunc const & p) {
             for (size_t C = 0; C < ncells_owned; ++C) 
                 for (size_t c = 0; c < meshMini_->numbOfMaterials(C); ++c)
-                    res[c][C] = p(meshMini_->centroid(C, c));
+                    res[c][C] = p(meshMini_->centroid(C, c), meshMini_->materialIndex(C, c));
             return *this;
         }
         bool PDE_DiffusionMFD_ASC::massMatrixIsExact_(WhetStone::DenseMatrix const & W, size_t c, double* diff) const {

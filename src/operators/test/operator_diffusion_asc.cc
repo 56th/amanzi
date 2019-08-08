@@ -94,10 +94,10 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.beg("set t-junction interface");
                 Tangram::Point3 p1, p2;
                 Tangram::Vector3 n1, n2;
-                logger.inp("set p1", p1);
-                logger.inp("set p2", p2);
-                logger.inp("set n1", n1);
-                logger.inp("set n2", n2);
+                logger.inp("set interface point  #1", p1);
+                logger.inp("set interface normal #1", n1);
+                logger.inp("set interface point  #2", p2);
+                logger.inp("set interface normal #2", n2);
                 double noise;
                 logger.inp("set noise in [0, 1]", noise);
                 if (noise < 0.) noise = 0.;
@@ -105,12 +105,13 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.end();
             std::array<double, 4> solnCoefs;
             logger.inp(
-                "set coefs { a, b, c, d } for exact solution p(x, y, z) = a x + b y + c z + d in mat1 region",
+                "set coefs { a, b, c, d } for exact solution p,\np(x, y, z) = p_1(x, y, z) = a x + b y + c z + d in material region #1",
                 solnCoefs
             );
             logger.beg("set eqn coefs");
-                double k, c;
-                logger.inp("set diffusion coef", k);
+                std::array<double, 3> k;
+                double c;
+                logger.inp("set diffusion coefs { k1, k2, k3 } for three regions", k);
                 logger.inp("set reaction coef", c);
             logger.end();
             auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
@@ -231,22 +232,33 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.buf << "numb of materials = " << numbOfMat;
             logger.log();
         logger.end();
-        logger.beg("set exact soln");
+        logger.beg("set up pw linear exact soln");
             DiffusionReactionEqnPwLinear eqn(
-                solnCoefs, k, c
+                solnCoefs, k[0], c
             );
+            eqn
+                .addPiece(k[1], Node(p1[0], p1[1], p1[2]), Node(n1[0], n1[1], n1[2]))
+                .addPiece(k[2], Node(p2[0], p2[1], p2[2]), Node(n2[0], n2[1], n2[2]));
+            for (size_t i : { 0, 1, 2 }) {
+                auto abcd = eqn.abcd(i);
+                logger.buf << "p_" << i + 1 << "(x, y, z) = " 
+                    << abcd[0] << " x + "
+                    << abcd[1] << " y + "
+                    << abcd[2] << " z + " << abcd[3] << '\n';
+            }
+            logger.log();
             PDE_DiffusionMFD_ASC::BC bc;
             bc.type = PDE_DiffusionMFD_ASC::BCType::Dirichlet;
             bc.p = [&](Node const & x) { return true; };
-            bc.f = [&](Node const & x) { return eqn.p(x); };
+            bc.f = [&](Node const & x, size_t matIndex) { return eqn.p(x, matIndex); };
         logger.end();
         logger.beg("set up operator");
             auto olist = plist.sublist("PK operator").sublist("diffusion operator asc");
             PDE_DiffusionMFD_ASC op(olist, meshMini);
-            op.setDiffusion([&](Node const & x) {
-                return eqn.K(x);
-            }).setReaction(eqn.c()).setRHS([&](Node const & x) {
-                return eqn.f(x);
+            op.setDiffusion([&](Node const & x, size_t matIndex) {
+                return eqn.K(x, matIndex);
+            }).setReaction(eqn.c()).setRHS([&](Node const & x, size_t matIndex) {
+                return eqn.f(x, matIndex);
             }).setBC(bc).assembleLocalConsentrationSystems();
             CompositeVectorSpace cvsP, cvsU;
             cvsP.SetMesh(mesh)->SetGhosted(true)->AddComponent("cell", AmanziMesh::CELL, numbOfMat);
@@ -260,8 +272,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.beg("compute exact soln d.o.f.");
             auto pFaceExact = pFace;
             auto pCellExact = pCell;
-            op.computeExactConcentrations(pFaceExact, [&](Node const & x) { return eqn.p(x); }); 
-            op.computeExactCellVals(pCellExact, [&](Node const & x) { return eqn.p(x); }); 
+            op.computeExactConcentrations(pFaceExact, [&](Node const & x, size_t matIndex) { return eqn.p(x, matIndex); }); 
+            op.computeExactCellVals(pCellExact, [&](Node const & x, size_t matIndex) { return eqn.p(x, matIndex); }); 
         logger.end();
         if (solveIndex == 0) {
             logger.beg("assemble global system");
@@ -383,12 +395,6 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                     float exVersion;
                     auto exID = ex_open(exPath, EX_WRITE, &exCPUWordSize, &exIOWordSize, &exVersion);
                     if (exID >= 0) {
-                        // std::vector<double> exPCell, exPCellExact;
-                        // for (size_t C = 0; C < numbOfCells; ++C) 
-                        //     for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c) {
-                        //         exPCell.push_back(pCell[c][C]);
-                        //         exPCellExact.push_back(pCellExact[c][C]);
-                        //     }
                         int numVars;
                         exErr = ex_get_var_param(exID, "g", &numVars);
                         logger.buf << "numb of global  vars: " << numVars << '\n';
@@ -416,14 +422,13 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                         std::vector<std::vector<Node>> // fluxes
                             exUCell(numbOfMat),
                             exUCellExact(numbOfMat);
-                        auto flux = [&](Node const & x) { return eqn.u(x); };
                         for (size_t C = 0; C < numbOfCells; ++C) 
                             for (size_t c = 0; c < meshMini->numbOfMaterials(C); ++c) {
                                 auto id = meshMini->materialIndex(C, c);
                                 exPCell[id].push_back(pCell[c][C]);
                                 exPCellExact[id].push_back(pCellExact[c][C]);
                                 exUCell[id].push_back(Node(0., 0., 0.)); // tmp
-                                exUCellExact[id].push_back(flux(meshMini->centroid(C, c)));
+                                exUCellExact[id].push_back(eqn.u(meshMini->centroid(C, c), meshMini->materialIndex(C, c)));
                             }
                         for (size_t i = 0; i < numbOfMat; ++i) {
                             auto nCells = exPCell[i].size();

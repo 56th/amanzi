@@ -87,6 +87,18 @@ namespace Amanzi {
                 mesh_->cell_get_faces_and_dirs(C, &macroFacesIndicies, &macroFacesNormalsDirs);
                 return macroFacesNormalsDirs;
             }
+            size_t faceMaterialIndex(size_t C, size_t g) const {
+                std::string err = __func__;
+                if (parentFaceLocalIndex(C, g) < 0) {
+                    throw std::invalid_argument(err + ": face is an interface face");
+                }
+                for (size_t c = 0; c < numbOfMaterials(C); ++c) {
+                    auto ind = facesGlobalIndicies(C, c);
+                    if (std::find(ind.begin(), ind.end(), g) != ind.end())
+                        return materialIndex(C, c);
+                }
+                throw std::invalid_argument(err + ": face material is not found");
+            }
         };
     }
 }
