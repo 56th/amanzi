@@ -337,6 +337,20 @@ namespace Amanzi {
                     res[c][C] = p(meshMini_->centroid(C, c), meshMini_->materialIndex(C, c));
             return *this;
         }
+        PDE_DiffusionMFD_ASC& PDE_DiffusionMFD_ASC::computeExactFluxes(Epetra_MultiVector& res, VectorFunc const & u) {
+            AmanziMesh::Entity_ID_List cellIndicies;
+            for (size_t f = 0; f < nfaces_owned; ++f) {
+                auto n = mesh_->face_normal(f);
+                n /= AmanziGeometry::norm(n);
+                mesh_->face_get_cells(f, AmanziMesh::Parallel_type::ALL, &cellIndicies);
+                auto c = cellIndicies.front();
+                if (cellIndicies.size() > 1) c = std::min(c, cellIndicies[1]);
+                auto v = mesh_->face_centroid(f) - mesh_->cell_centroid(c);
+                if (v * n < 0.) n *= -1.;
+                res[0][f] = u(mesh_->face_centroid(f), meshMini_->materialIndex(c, 0)) * n;
+            }
+            return *this;
+        }
         bool PDE_DiffusionMFD_ASC::massMatrixIsExact_(WhetStone::DenseMatrix const & W, size_t c, double* diff) const {
             auto M = W;
             M.Inverse();

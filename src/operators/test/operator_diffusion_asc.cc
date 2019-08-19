@@ -279,12 +279,15 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             auto& pCell = *p.ViewComponent("cell", true);
             auto& pFace = *p.ViewComponent("face", true);
             auto  u     = CompositeVector(cvsU);
+            auto& uFace = *u.ViewComponent("face", true);
         logger.end();
         logger.beg("compute exact soln d.o.f.");
             auto pFaceExact = pFace;
             auto pCellExact = pCell;
+            auto uFaceExact = uFace;
             op.computeExactConcentrations(pFaceExact, [&](Node const & x, size_t matIndex) { return eqn.p(x, matIndex); }); 
             op.computeExactCellVals(pCellExact, [&](Node const & x, size_t matIndex) { return eqn.p(x, matIndex); }); 
+            op.computeExactFluxes(uFaceExact, [&](Node const & x, size_t matIndex) { return eqn.u(x, matIndex); }); 
         logger.end();
         if (solveIndex == 0) {
             logger.beg("assemble global system");
@@ -374,8 +377,13 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             pCellMean /= vol;
             pCellExactMean /= vol;
             l2 = sqrt(l2);
+            double l2Flux = 0.;
+            for (size_t f = 0; f < numbOfFaces; ++f)
+                l2Flux += pow(uFaceExact[0][f] - uFace[0][f], 2.) * mesh->face_area(f);
+            l2Flux = sqrt(l2Flux);
             logger.buf 
                 << "flux residual: " << fluxRes << '\n'
+                << "flux l2   err: " << l2Flux << '\n'
                 << "cell l2   err: " << l2 << '\n' 
                 << "cell lInf err: " << lInf << '\n' 
                 << "volume:        " << vol << '\n'
@@ -387,6 +395,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             Teuchos::ParameterList plistOut;
             plistOut.set("h", h);
             plistOut.set("flux residual", fluxRes);
+            plistOut.set("flux l2 err", l2Flux);
             plistOut.set("cell l2 err", l2);
             plistOut.set("cell lInf err", lInf);
             plistOut.set("p_h mean", pCellMean);

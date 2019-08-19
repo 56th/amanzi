@@ -18,6 +18,7 @@ namespace Amanzi {
         public:
             using Node = AmanziGeometry::Point;
             using ScalarFunc = std::function<double(Node const &, size_t)>;
+            using VectorFunc = std::function<Node(Node const &, size_t)>;
             using TensorFunc = std::function<WhetStone::Tensor(Node const &, size_t)>;
             using Predicate = std::function<bool(Node const &)>;
             enum class BCType { Dirichlet, Neumann };
@@ -55,6 +56,7 @@ namespace Amanzi {
             PDE_DiffusionMFD_ASC& assembleLocalConsentrationSystems();
             PDE_DiffusionMFD_ASC& computeExactConcentrations(Epetra_MultiVector&, ScalarFunc const &);
             PDE_DiffusionMFD_ASC& computeExactCellVals(Epetra_MultiVector&, ScalarFunc const &);
+            PDE_DiffusionMFD_ASC& computeExactFluxes(Epetra_MultiVector&, VectorFunc const &);
             PDE_DiffusionMFD_ASC& recoverSolution(CompositeVector&, CompositeVector&, ScalarFunc const *, double*);
             PDE_DiffusionMFD_ASC& setDiffusion(TensorFunc const &);
             PDE_DiffusionMFD_ASC& setRHS(ScalarFunc const &);
