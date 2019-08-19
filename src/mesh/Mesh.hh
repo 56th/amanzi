@@ -99,6 +99,28 @@ class Mesh {
   // virtual destructor
   virtual ~Mesh() = default;
 
+  // typycal mesh size
+  double cell_diameter(size_t c) const {
+    std::vector<AmanziGeometry::Point> coords;
+    cell_get_coordinates(c, &coords);
+    auto n = coords.size();
+    double h = 0.;
+    for (size_t i = 0; i < n; ++i)
+      for (size_t j = i + 1; j < n; ++j) {
+        auto dist = (coords[i] - coords[j]) * (coords[i] - coords[j]);
+        h = std::max(h, dist);
+      }
+    return sqrt(h);
+  }
+
+  double diameter() const {
+    auto n = num_entities(CELL, Parallel_type::OWNED);
+    double h = 0.;
+    for (size_t i = 0; i < n; ++i)
+      h = std::max(h, cell_diameter(i));
+    return h;
+  }
+
   //
   // Accessors and Mutators
   // ----------------------

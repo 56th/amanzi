@@ -143,8 +143,10 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             Teuchos::RCP<const Mesh> mesh = meshfactory.create("test/meshes/" + meshName);
             auto numbOfCells = mesh->num_entities(AmanziMesh::CELL, AmanziMesh::Parallel_type::OWNED);
             auto numbOfFaces = mesh->num_entities(AmanziMesh::FACE, AmanziMesh::Parallel_type::OWNED);
+            auto h = mesh->diameter();
             logger.buf << "numb of cells: " << numbOfCells << '\n'
-                       << "numb of faces: " << numbOfFaces;
+                       << "numb of faces: " << numbOfFaces << '\n'
+                       << "h:             " << h;
             logger.log();
             logger.beg("tangram XMOF interface reconstruction");
                 Wonton::Amanzi_Mesh_Wrapper meshWrapper(*mesh);
@@ -383,6 +385,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
         logger.end();
         logger.beg("export soln errors and other stats to " + ioNameBaseXML);
             Teuchos::ParameterList plistOut;
+            plistOut.set("h", h);
             plistOut.set("flux residual", fluxRes);
             plistOut.set("cell l2 err", l2);
             plistOut.set("cell lInf err", lInf);
