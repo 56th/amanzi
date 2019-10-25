@@ -96,7 +96,7 @@ namespace Amanzi {
                         for (size_t c = 0; c < m; ++c) {
                             auto& ind = const_cast<std::vector<int>&>(polyCells_[C]->matpoly_faces(c));
                             for (auto it = ind.begin(); it != ind.end(); ++it) {
-                                auto area = Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(*it));
+                                auto area = Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(*it), std::numeric_limits<double>::epsilon());
                                 if (fpEqual_(area, 0., deleteEmptyFacesTol)) {
                                     deletedFaces.insert(*it);
                                     ind.erase(it);
@@ -316,18 +316,18 @@ namespace Amanzi {
                 std::vector<double> a;
                 auto pts = vertices_(C);
                 auto vrt = polyCells_[C]->matface_vertices(g);
-                Tangram::polygon3d_moments(pts, vrt, a);
+                Tangram::polygon3d_moments(pts, vrt, a, std::numeric_limits<double>::epsilon());
                 if (a[0] != 0.) return AmanziGeometry::Point(a[1] / a[0], a[2] / a[0], a[3] / a[0]);
                 return AmanziGeometry::Point(pts[vrt[0]][0], pts[vrt[0]][1], pts[vrt[0]][2]);
             }
             double area(size_t C, size_t g) const final {
                 g = faceRenum_[C].at(g);
-                return Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(g));
+                return Tangram::polygon3d_area(vertices_(C), polyCells_[C]->matface_vertices(g), std::numeric_limits<double>::epsilon());
             }
             AmanziGeometry::Point normal(size_t C, size_t g) const final {
                 auto i = parentFaceLocalIndex(C, g);
                 if (i == -1) { // int mini-face
-                    auto tmp = Tangram::polygon3d_normal(vertices_(C), polyCells_[C]->matface_vertices(faceRenum_[C].at(g)));
+                    auto tmp = Tangram::polygon3d_normal(vertices_(C), polyCells_[C]->matface_vertices(faceRenum_[C].at(g)), std::numeric_limits<double>::epsilon());
                     return AmanziGeometry::Point(tmp[0], tmp[1], tmp[2]);
                 }
                 auto b = macroFacesNormalsDirs(C)[i] * mesh_->face_normal(macroFacesIndicies(C)[i]);

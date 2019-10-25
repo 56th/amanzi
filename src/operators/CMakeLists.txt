@@ -56,8 +56,7 @@ include_directories(${LOGGER_PATH}/sln/Sources/)
 # tangram
 set(TANGRAM_PATH /home/alexander/Documents/Amanzi/tangram/)
 include_directories(${TANGRAM_PATH})
-
-
+include_directories(${TANGRAM_PATH}/wonton)
 
 # Need this define. Errors from MSTK include files 
 # about MPI_COMM_WORLD. --lpritch

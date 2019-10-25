@@ -168,7 +168,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                         material_interfaces[iplane].dist2origin = -Wonton::dot(material_interface_points[iplane].asV(), material_interfaces[iplane].normal);
                     }
                     std::vector<std::vector<std::vector<r3d_poly>>> reference_mat_polys;
-                    get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, material_interfaces, mesh_materials, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, reference_mat_polys, decompose_cells);
+                    get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, material_interfaces, mesh_materials, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, std::numeric_limits<double>::epsilon(), std::numeric_limits<double>::epsilon(), decompose_cells, &reference_mat_polys);
                     std::vector<int> offsets(numbOfCells, 0.);
                     for (int icell = 0; icell < numbOfCells - 1; icell++)
                         offsets[icell + 1] = offsets[icell] + cell_num_mats[icell];
@@ -203,7 +203,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                             }
                             std::shared_ptr<Tangram::CellMatPoly<3>> cmp_ptr(new Tangram::CellMatPoly<3>(icell));
                             Tangram::MatPoly<3> cell_matpoly;
-                            cell_get_matpoly(meshWrapper, icell, &cell_matpoly);
+                            cell_get_matpoly(meshWrapper, icell, &cell_matpoly, std::numeric_limits<double>::epsilon());
                             cell_matpoly.set_mat_id(cell_mat_ids[offsets[icell]]);
                             cmp_ptr->add_matpoly(cell_matpoly);
                             cellmatpoly_list[icell] = cmp_ptr;
