@@ -112,7 +112,7 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.beg("set eqn coefs");
                 std::array<double, 3> k;
                 double c;
-                logger.inp("set diffusion coefs { k1, k2, k3 } for three regions", k);
+                logger.inp("set diffusion coefs { k1, k2, k3 } for three regions (for sphere k1 is outside, k2 is inside)", k);
                 logger.inp("set reaction coef", c);
             logger.end();
             auto solveIndex = logger.opt("get the solution", { "linear solve", "recover from exact concentrations" });
@@ -124,6 +124,13 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                 logger.wrn("tangram does not divide T-junction face into two subface; this case currently is not handled by ASC");
             auto meshMiniCheck = logger.yes("check mini-mesh");
             auto exportWhat = logger.opt("export", { "mof mesh only", "soln", "none" });
+            double sphereRadius;
+            logger.inp("set sphere radius (set 0. for planar inclusion)", sphereRadius);
+            if (sphereRadius < 0.) sphereRadius = 0.;
+            Tangram::Point3 sphereCenter;
+            logger.inp("set sphere center", sphereCenter);
+            int nquadrant_samples;
+            logger.inp("set nquadrant_samples", nquadrant_samples);
             logger.exp("stdin.txt");
         logger.end();
         logger.beg("load mesh");
@@ -156,7 +163,8 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                     std::vector<int> cell_mat_ids;
                     std::vector<double> cell_mat_volfracs;
                     std::vector<Wonton::Point<3>> cell_mat_centroids;
-                    const std::vector<int> mesh_materials = {0, 1, 2};
+                    std::vector<int> mesh_materials = {0, 1, 2};
+                    if (sphereRadius != 0.) mesh_materials.resize(2);
                     const std::vector<Tangram::Vector3> material_interface_normals = { n1, n2 };
                     const std::vector<Tangram::Point3> material_interface_points = { p1, p2 };
                     auto decompose_cells = false; // assuming convex cells
@@ -168,7 +176,10 @@ TEST(OPERATOR_DIFFUSION_ASC) {
                         material_interfaces[iplane].dist2origin = -Wonton::dot(material_interface_points[iplane].asV(), material_interfaces[iplane].normal);
                     }
                     std::vector<std::vector<std::vector<r3d_poly>>> reference_mat_polys;
-                    get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, material_interfaces, mesh_materials, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, std::numeric_limits<double>::epsilon(), std::numeric_limits<double>::epsilon(), decompose_cells, &reference_mat_polys);
+                    if (sphereRadius == 0.)
+                        get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, material_interfaces, mesh_materials, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, std::numeric_limits<double>::epsilon(), std::numeric_limits<double>::epsilon(), decompose_cells, &reference_mat_polys);
+                    else
+                        get_material_moments<Wonton::Amanzi_Mesh_Wrapper>(meshWrapper, mesh_materials, sphereCenter, sphereRadius, nquadrant_samples, cell_num_mats, cell_mat_ids, cell_mat_volfracs, cell_mat_centroids, std::numeric_limits<double>::epsilon(), std::numeric_limits<double>::epsilon(), decompose_cells, &reference_mat_polys);
                     std::vector<int> offsets(numbOfCells, 0.);
                     for (int icell = 0; icell < numbOfCells - 1; icell++)
                         offsets[icell + 1] = offsets[icell] + cell_num_mats[icell];
