@@ -246,29 +246,42 @@ TEST(OPERATOR_DIFFUSION_ASC) {
             logger.buf << "numb of materials = " << numbOfMat;
             logger.log();
         logger.end();
-        logger.beg("set up pw linear exact soln");
-            DiffusionReactionEqnPwLinear eqn(
-                3 /* numb of regions */, solnIndex,
-                solnCoefs, k[solnIndex], c
-            );
-            Node N0(n1[0], n1[1], n1[2]), N1(n2[0], n2[1], n2[2]), P0(p1[0], p1[1], p1[2]), P1(p2[0], p2[1], p2[2]);
-            if (solnIndex == 0)
-                eqn.addPiece(k[1], P0, N0, 0, 1)
-                   .addPiece(k[2], P1, N1, 1, 2);
-            if (solnIndex == 2)
-                eqn.addPiece(k[1], P1, N1, 2, 1)
-                   .addPiece(k[0], P0, N0, 1, 0);
-            if (solnIndex == 1)
-                eqn.addPiece(k[0], P0, N0, 1, 0)
-                   .addPiece(k[2], P1, N1, 1, 2);
-            for (size_t i : { 0, 1, 2 }) {
-                auto abcd = eqn.abcd(i);
-                logger.buf << "p_" << i << "(x, y, z) = " 
-                    << abcd[0] << " x + "
-                    << abcd[1] << " y + "
-                    << abcd[2] << " z + " << abcd[3] << '\n';
+        logger.beg("set up pw linear / pw quadratic exact soln");
+            std::shared_ptr<DiffusionReactionEqn> eqnPtr;
+            if (sphereRadius == 0.) {
+                auto* eqnPtrPwLinear = new DiffusionReactionEqnPwLinear(
+                    3 /* numb of regions */, solnIndex,
+                    solnCoefs, k[solnIndex], c
+                );
+                Node N0(n1[0], n1[1], n1[2]), N1(n2[0], n2[1], n2[2]), P0(p1[0], p1[1], p1[2]), P1(p2[0], p2[1], p2[2]);
+                if (solnIndex == 0)
+                    (*eqnPtrPwLinear)
+                        .addPiece(k[1], P0, N0, 0, 1)
+                        .addPiece(k[2], P1, N1, 1, 2);
+                if (solnIndex == 2)
+                    (*eqnPtrPwLinear)
+                        .addPiece(k[1], P1, N1, 2, 1)
+                        .addPiece(k[0], P0, N0, 1, 0);
+                if (solnIndex == 1)
+                    (*eqnPtrPwLinear)
+                        .addPiece(k[0], P0, N0, 1, 0)
+                        .addPiece(k[2], P1, N1, 1, 2);
+                for (size_t i : { 0, 1, 2 }) {
+                    auto abcd = eqnPtrPwLinear->abcd(i);
+                    logger.buf << "p_" << i << "(x, y, z) = " 
+                        << abcd[0] << " x + "
+                        << abcd[1] << " y + "
+                        << abcd[2] << " z + " << abcd[3] << '\n';
+                }
+                eqnPtr.reset(eqnPtrPwLinear);
+            } else {
+                auto* eqnPtrPwQuadratic = new DiffusionReactionEqnPwQuadratic(sphereRadius, k[0], k[1], c);
+                for (size_t i : {0, 1})
+                    logger.buf << "p_" << i << "(x, y, z) = " << eqnPtrPwQuadratic->a(i) << "(x^2 + y^2 + z^2 - " << sphereRadius << "^2)\n";
+                eqnPtr.reset(eqnPtrPwQuadratic);
             }
             logger.log();
+            auto& eqn = *eqnPtr;
             PDE_DiffusionMFD_ASC::BC bc;
             bc.type = PDE_DiffusionMFD_ASC::BCType::Dirichlet;
             bc.p = [&](Node const & x) { return true; };

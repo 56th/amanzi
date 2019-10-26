@@ -139,4 +139,66 @@ public:
     }
 };
 
+class DiffusionReactionEqnQuadratic : public DiffusionReactionEqn { // a(x^2 + y^2 + z^2 - r^2)
+protected:
+    Tensor K_;
+    double a_, r_, c_;
+public:
+    DiffusionReactionEqnQuadratic(        
+        double a = 1., double r = 1.,
+        double k = 1., double c = 0.
+    ) 
+    : c_(c)
+    , a_(a)
+    , r_(r)
+    , K_(3, 2) {
+        K_.MakeDiagonal(k); 
+    }
+    double a() const {
+        return a_;
+    }
+    double p(Node const & x, size_t matIndex = 0) final {
+        return a_ * (x * x - r_ * r_);
+    }
+    Node pGrad(Node const & x, size_t matIndex = 0) final {
+        return 2. * a_ * x;
+    }
+    Tensor K(Node const &, size_t matIndex = 0) final {
+        return K_;
+    }
+    double f(Node const & x, size_t matIndex = 0) final {
+        return c_ * p(x, matIndex) - 6. * a_ * K_(0, 0);
+    }
+    double c() final {
+        return c_;
+    }
+};
+
+class DiffusionReactionEqnPwQuadratic : public DiffusionReactionEqn {
+    std::array<DiffusionReactionEqnQuadratic, 2> eqns_;
+public:
+    DiffusionReactionEqnPwQuadratic(double r, double k1 = 1., double k2 = 1., double c = 0.) {
+        eqns_[0] = DiffusionReactionEqnQuadratic(1., r, k1, c);
+        eqns_[1] = DiffusionReactionEqnQuadratic(k1 / k2, r, k2, c);
+    }
+    double a(size_t i) const {
+        return eqns_.at(i).a();
+    }
+    double p(Node const & x, size_t matIndex = 0) final {
+        return eqns_.at(matIndex).p(x);
+    }
+    Node pGrad(Node const & x, size_t matIndex = 0) final {
+        return eqns_.at(matIndex).pGrad(x);
+    }
+    Tensor K(Node const & x, size_t matIndex = 0) final {
+        return eqns_.at(matIndex).K(x);
+    }
+    double f(Node const & x, size_t matIndex = 0) final {
+        return eqns_.at(matIndex).f(x);
+    }
+    double c() final {
+        return eqns_.front().c();
+    }
+};
+
 #endif
